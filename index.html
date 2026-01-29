@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro POS System - GitHub Edition</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fadeIn 0.3s ease-out forwards; }
+        .loader { border: 3px solid #f3f3f3; border-top: 3px solid #1f2937; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased selection:bg-blue-100 selection:text-blue-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
+
+        // --- ICONS ---
+        const Icon = ({ path, size = 20, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{path}</svg>
+        );
+        const Icons = {
+            Dashboard: (p) => <Icon {...p} path={<><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>} />,
+            Cart: (p) => <Icon {...p} path={<><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></>} />,
+            Box: (p) => <Icon {...p} path={<><path d="m16.5 9.4-9-5.19"/><path d="m21 16-9 5.19-9-5.19"/><path d="M3 11.05v6.25c0 1.66.57 3.2 1.63 4.39"/><path d="M12 22V10.8"/><path d="M12 2.76c.49-.28 1.5-.28 2 0l7.37 4.26c.86.5 1.63 1.25 1.63 2.78v5.4"/><path d="M21 15.2v-4.4"/><path d="M12 2.76 4.63 7.02c-.86.5-1.63 1.25-1.63 2.78v.2"/></>} />,
+            Users: (p) => <Icon {...p} path={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
+            Report: (p) => <Icon {...p} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></>} />,
+            Settings: (p) => <Icon {...p} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />,
+            Logout: (p) => <Icon {...p} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>} />,
+            Plus: (p) => <Icon {...p} path={<><path d="M5 12h14"/><path d="M12 5v14"/></>} />,
+            Minus: (p) => <Icon {...p} path={<><path d="M5 12h14"/></>} />,
+            Trash: (p) => <Icon {...p} path={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></>} />,
+            Search: (p) => <Icon {...p} path={<><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></>} />,
+            X: (p) => <Icon {...p} path={<><path d="M18 6 6 18"/><path d="m6 6 12 12"/></>} />,
+            Printer: (p) => <Icon {...p} path={<><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></>} />,
+            Download: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></>} />,
+            Github: (p) => <Icon {...p} path={<><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></>} />,
+            CloudCheck: (p) => <Icon {...p} path={<><path d="M12 21a6 6 0 0 0 6-6c0-3.3-2.7-6-6-6-.8 0-1.5.1-2.2.3A7.5 7.5 0 0 0 0 12.5a7.5 7.5 0 0 0 7.5 7.5h4.5"/><polyline points="16 12 18 14 22 10"/></>} />,
+            CloudOff: (p) => <Icon {...p} path={<><path d="M22.61 16.95A5 5 0 0 0 18 10h-1.26a8 8 0 0 0-7.05-6M5 5a8 8 0 0 0 4 15h9a5 5 0 0 0 1.7-.3"/><line x1="1" x2="23" y1="1" y2="23"/></>} />,
+        };
+
+        // --- COMPONENTS ---
+        const Card = ({ children, className = "" }) => <div className={`bg-white rounded-xl shadow-sm border border-slate-200 ${className}`}>{children}</div>;
+        
+        const Button = ({ children, onClick, variant = "primary", className = "", disabled=false, ...props }) => {
+            const styles = {
+                primary: "bg-blue-600 text-white hover:bg-blue-700 shadow-blue-200",
+                secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200",
+                danger: "bg-red-50 text-red-600 hover:bg-red-100",
+                outline: "border border-slate-300 text-slate-600 hover:bg-slate-50",
+                success: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200",
+                github: "bg-slate-900 text-white hover:bg-black"
+            };
+            return (
+                <button onClick={onClick} disabled={disabled} className={`px-4 py-2 rounded-lg font-medium transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${styles[variant]} ${className}`} {...props}>{children}</button>
+            );
+        };
+
+        const Input = ({ label, ...props }) => (
+            <div className="mb-3">
+                {label && <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{label}</label>}
+                <input className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" {...props} />
+            </div>
+        );
+
+        const Modal = ({ isOpen, onClose, title, children }) => {
+            if (!isOpen) return null;
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in">
+                        <div className="flex justify-between items-center p-4 border-b border-slate-100">
+                            <h3 className="font-bold text-lg">{title}</h3>
+                            <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full"><Icons.X size={20}/></button>
+                        </div>
+                        <div className="p-4 max-h-[80vh] overflow-y-auto">{children}</div>
+                    </div>
+                </div>
+            );
+        };
+
+        const Alert = ({ type, message }) => {
+            if (!message) return null;
+            const colors = type === 'error' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200';
+            return <div className={`p-3 rounded-lg border text-sm mb-4 ${colors}`}>{message}</div>;
+        };
+
+        // --- GITHUB API HELPERS ---
+        const GITHUB_API_URL = "https://api.github.com";
+        const GIST_FILENAME = "pos_data.json";
+
+        const saveToGist = async (token, gistId, data) => {
+            try {
+                const response = await fetch(`${GITHUB_API_URL}/gists/${gistId}`, {
+                    method: "PATCH",
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Accept": "application/vnd.github.v3+json",
+                    },
+                    body: JSON.stringify({
+                        files: {
+                            [GIST_FILENAME]: {
+                                content: JSON.stringify(data)
+                            }
+                        }
+                    })
+                });
+                if (!response.ok) throw new Error("Failed to save to GitHub");
+                return await response.json();
+            } catch (error) {
+                console.error(error);
+                throw error;
+            }
+        };
+
+        const loadFromGist = async (token, gistId) => {
+            try {
+                // Add timestamp to prevent caching
+                const response = await fetch(`${GITHUB_API_URL}/gists/${gistId}?t=${Date.now()}`, {
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Accept": "application/vnd.github.v3+json",
+                    }
+                });
+                if (!response.ok) throw new Error("Failed to load from GitHub");
+                const json = await response.json();
+                if (json.files && json.files[GIST_FILENAME]) {
+                    return JSON.parse(json.files[GIST_FILENAME].content);
+                }
+                return null;
+            } catch (error) {
+                console.error(error);
+                throw error;
+            }
+        };
+
+        const createGist = async (token, description, initialData) => {
+            try {
+                const response = await fetch(`${GITHUB_API_URL}/gists`, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Accept": "application/vnd.github.v3+json",
+                    },
+                    body: JSON.stringify({
+                        description: description,
+                        public: false, // Create PRIVATE gist for security
+                        files: {
+                            [GIST_FILENAME]: {
+                                content: JSON.stringify(initialData)
+                            }
+                        }
+                    })
+                });
+                if (!response.ok) throw new Error("Failed to create Gist");
+                return await response.json();
+            } catch (error) {
+                console.error(error);
+                throw error;
+            }
+        };
+
+        // --- EXCEL/CSV EXPORT UTILS ---
+        const downloadCSV = (data, filename) => {
+            if (!data || !data.length) {
+                alert("No data to export");
+                return;
+            }
+            const separator = ',';
+            const keys = Object.keys(data[0]);
+            const csvContent = [
+                keys.join(separator),
+                ...data.map(row => keys.map(k => {
+                    let cell = row[k] === null || row[k] === undefined ? '' : row[k];
+                    cell = cell instanceof Date ? cell.toISOString() : cell.toString();
+                    if (cell.includes(separator) || cell.includes('"')) {
+                        cell = `"${cell.replace(/"/g, '""')}"`;
+                    }
+                    return cell;
+                }).join(separator))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        };
+
+        // --- INITIAL DATA ---
+        const DEFAULT_DATA = {
+            products: [
+                { id: 1, name: "Espresso", price: 150, category: "Coffee", stock: 100 },
+                { id: 2, name: "Masala Chai", price: 40, category: "Tea", stock: 200 },
+                { id: 3, name: "Veg Puff", price: 35, category: "Bakery", stock: 50 },
+            ],
+            staff: [
+                { id: 1, name: "Manager", role: "Manager", pin: "1234" },
+                { id: 2, name: "Cashier", role: "Staff", pin: "0000" },
+            ],
+            customers: [],
+            sales: [],
+            stockLog: [],
+            profile: { name: "My Shop", address: "123 Street", phone: "555-0101" }
+        };
+
+        // --- MAIN APP ---
+        function App() {
+            // VIEW STATE
+            const [view, setView] = useState('login'); 
+            const [activeUser, setActiveUser] = useState(null);
+            
+            // GITHUB CONFIG STATE
+            const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
+            const [isOnline, setIsOnline] = useState(false);
+            const [isSyncing, setIsSyncing] = useState(false);
+            const [syncError, setSyncError] = useState(null);
+
+            // APP DATA STATE
+            const [data, setData] = useState(() => JSON.parse(localStorage.getItem('pos_data')) || DEFAULT_DATA);
+            
+            // UI STATE
+            const [cart, setCart] = useState([]);
+            const [activeCustomer, setActiveCustomer] = useState(null);
+            const [search, setSearch] = useState("");
+            const [receiptTx, setReceiptTx] = useState(null);
+
+            // Save to LocalStorage on change
+            useEffect(() => {
+                localStorage.setItem('pos_data', JSON.stringify(data));
+            }, [data]);
+
+            // Save GH Config
+            useEffect(() => {
+                localStorage.setItem('gh_config', JSON.stringify(ghConfig));
+                if (ghConfig.token && ghConfig.gistId) {
+                    setIsOnline(true);
+                    // Initial sync
+                    syncDataFromCloud();
+                } else {
+                    setIsOnline(false);
+                }
+            }, [ghConfig]);
+
+            // --- GITHUB SYNC ACTIONS ---
+            const syncDataToCloud = async (newData) => {
+                if (!ghConfig.token || !ghConfig.gistId) return;
+                setIsSyncing(true);
+                setSyncError(null);
+                try {
+                    await saveToGist(ghConfig.token, ghConfig.gistId, newData || data);
+                    console.log("Synced to GitHub successfully");
+                } catch (e) {
+                    setSyncError("Failed to save to Cloud.");
+                } finally {
+                    setIsSyncing(false);
+                }
+            };
+
+            const syncDataFromCloud = async () => {
+                if (!ghConfig.token || !ghConfig.gistId) return;
+                setIsSyncing(true);
+                try {
+                    const cloudData = await loadFromGist(ghConfig.token, ghConfig.gistId);
+                    if (cloudData) {
+                        setData(cloudData);
+                        console.log("Loaded from GitHub successfully");
+                    }
+                } catch (e) {
+                    setSyncError("Failed to load from Cloud.");
+                } finally {
+                    setIsSyncing(false);
+                }
+            };
+
+            const handleCreateDatabase = async () => {
+                if (!ghConfig.token) {
+                    alert("Please enter a GitHub Token first!");
+                    return;
+                }
+                setIsSyncing(true);
+                try {
+                    const gist = await createGist(ghConfig.token, "POS System Database", data);
+                    const newConfig = { ...ghConfig, gistId: gist.id };
+                    setGhConfig(newConfig);
+                    alert("Database Created Successfully on GitHub! Gist ID saved.");
+                } catch (e) {
+                    alert("Error creating database. Check your token.");
+                } finally {
+                    setIsSyncing(false);
+                }
+            };
+
+            // --- BUSINESS LOGIC ---
+            const updateData = (key, value) => {
+                const newData = { ...data, [key]: value };
+                setData(newData);
+                // Auto-sync on critical updates (debounced in a real app, direct here)
+                if (['products', 'sales', 'stockLog'].includes(key)) {
+                    syncDataToCloud(newData);
+                }
+            };
+
+            const handleLogin = (pin) => {
+                const user = data.staff.find(s => s.pin === pin);
+                if (user) {
+                    setActiveUser(user);
+                    setView('pos');
+                } else {
+                    alert("Invalid PIN. Try 1234 or 0000");
+                }
+            };
+
+            const checkout = () => {
+                if (cart.length === 0) return;
+                
+                const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const tx = {
+                    id: Date.now().toString(36),
+                    date: new Date().toISOString(),
+                    items: cart,
+                    total,
+                    customer: activeCustomer || { name: "Walk-in", id: "walkin" },
+                    cashier: activeUser.name
+                };
+
+                const newSales = [tx, ...data.sales];
+                
+                // Update Stock
+                const newProducts = data.products.map(p => {
+                    const cartItem = cart.find(c => c.id === p.id);
+                    if (cartItem) {
+                        return { ...p, stock: p.stock - cartItem.quantity };
+                    }
+                    return p;
+                });
+
+                // Create Stock Log
+                const newLogs = cart.map(item => ({
+                    date: new Date().toISOString(),
+                    type: 'OUT',
+                    prodName: item.name,
+                    qty: item.quantity,
+                    reason: 'Sale'
+                }));
+
+                // Batch update state
+                const newData = {
+                    ...data,
+                    sales: newSales,
+                    products: newProducts,
+                    stockLog: [...newLogs, ...data.stockLog]
+                };
+
+                setData(newData);
+                syncDataToCloud(newData); // Save to GitHub
+                
+                setReceiptTx(tx);
+                setCart([]);
+            };
+
+            // --- VIEWS ---
+
+            const LoginScreen = () => {
+                const [pin, setPin] = useState("");
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-200">
+                        <Card className="w-80 p-8 text-center relative overflow-hidden">
+                             {isOnline && <div className="absolute top-0 left-0 w-full h-1 bg-green-500"></div>}
+                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-white"><Icons.Box size={32}/></div>
+                            <h1 className="text-2xl font-bold mb-2">{data.profile.name}</h1>
+                            <p className="text-slate-500 mb-6">Staff Login</p>
+                            <div className="bg-slate-100 p-3 rounded-lg text-2xl font-mono tracking-widest mb-4 h-14 flex items-center justify-center">{pin.replace(/./g, '•')}</div>
+                            <div className="grid grid-cols-3 gap-2">
+                                {[1,2,3,4,5,6,7,8,9,'C',0,'➜'].map(k => (
+                                    <button key={k} 
+                                        onClick={() => k === 'C' ? setPin('') : k === '➜' ? handleLogin(pin) : setPin(pin + k)}
+                                        className={`p-3 rounded-lg font-bold text-lg ${k === '➜' ? 'bg-blue-600 text-white' : k === 'C' ? 'bg-red-100 text-red-600' : 'bg-white border hover:bg-slate-50'}`}
+                                    >{k}</button>
+                                ))}
+                            </div>
+                            <div className="mt-6 pt-4 border-t text-xs text-slate-400">
+                                <div>System Status: <span className={isOnline ? "text-green-600 font-bold" : "text-slate-500"}>{isOnline ? "Connected to GitHub" : "Local Mode"}</span></div>
+                            </div>
+                        </Card>
+                    </div>
+                );
+            };
+
+            const POSView = () => {
+                const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+                const total = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+
+                return (
+                    <div className="flex h-full gap-4">
+                        <div className="flex-1 flex flex-col">
+                            <div className="flex justify-between mb-4">
+                                <h2 className="text-2xl font-bold">Point of Sale</h2>
+                                <div className="relative">
+                                    <input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 pr-4 py-2 border rounded-full w-64"/>
+                                    <span className="absolute left-3 top-2.5 text-slate-400"><Icons.Search size={18}/></span>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pb-4">
+                                {filtered.map(p => (
+                                    <div key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
+                                        const exist = prev.find(i => i.id === p.id);
+                                        return exist ? prev.map(i => i.id === p.id ? {...i, quantity: i.quantity + 1} : i) : [...prev, {...p, quantity: 1}];
+                                    })} className={`bg-white p-4 rounded-xl border hover:shadow-md cursor-pointer transition-all ${p.stock === 0 ? 'opacity-50 grayscale' : ''}`}>
+                                        <div className="h-20 bg-slate-100 rounded-lg mb-2 flex items-center justify-center font-bold text-2xl text-slate-300">{p.name[0]}</div>
+                                        <div className="font-bold truncate">{p.name}</div>
+                                        <div className="flex justify-between mt-1">
+                                            <span className="text-blue-600 font-bold">₹{p.price}</span>
+                                            <span className="text-xs text-slate-500">{p.stock} left</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="w-80 bg-white rounded-xl shadow-lg border flex flex-col h-full">
+                            <div className="p-4 border-b">
+                                <select className="w-full p-2 border rounded mb-2 bg-slate-50" onChange={e => setActiveCustomer(data.customers.find(c => c.id == e.target.value))}>
+                                    <option value="">Walk-in Customer</option>
+                                    {data.customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                                {cart.map(item => (
+                                    <div key={item.id} className="flex justify-between items-center bg-slate-50 p-2 rounded">
+                                        <div className="flex-1">
+                                            <div className="font-bold text-sm">{item.name}</div>
+                                            <div className="text-xs text-slate-500">₹{item.price} x {item.quantity}</div>
+                                        </div>
+                                        <button onClick={() => setCart(prev => prev.filter(i => i.id !== item.id))} className="text-red-400 hover:text-red-600"><Icons.Trash size={16}/></button>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="p-4 bg-slate-50 border-t">
+                                <div className="flex justify-between text-xl font-bold mb-4"><span>Total</span><span>₹{total.toFixed(2)}</span></div>
+                                <Button onClick={checkout} className="w-full py-3 text-lg">PAY NOW</Button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const SettingsView = () => {
+                const [tokenInput, setTokenInput] = useState(ghConfig.token);
+                const [gistInput, setGistInput] = useState(ghConfig.gistId);
+
+                const saveConfig = () => {
+                    setGhConfig({ token: tokenInput, gistId: gistInput });
+                    alert("Settings Saved! Attempting to sync...");
+                };
+
+                return (
+                    <div className="max-w-2xl mx-auto mt-6 space-y-6">
+                        <Card className="p-8">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-3 bg-slate-900 text-white rounded-lg"><Icons.Github size={24}/></div>
+                                <div>
+                                    <h2 className="text-2xl font-bold">GitHub Database Setup</h2>
+                                    <p className="text-slate-500 text-sm">Use GitHub Gists as a free cloud database.</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div className="bg-blue-50 p-4 rounded-lg text-sm text-blue-800">
+                                    <strong>How to get a Token:</strong>
+                                    <ol className="list-decimal ml-5 mt-1 space-y-1">
+                                        <li>Go to GitHub Settings &gt; Developer Settings &gt; Personal Access Tokens (Classic).</li>
+                                        <li>Generate New Token. Select 'gist' scope.</li>
+                                        <li>Paste the token below.</li>
+                                    </ol>
+                                </div>
+
+                                <Input label="GitHub Personal Access Token" type="password" value={tokenInput} onChange={e => setTokenInput(e.target.value)} placeholder="ghp_..." />
+                                
+                                <div className="flex gap-4 items-end">
+                                    <div className="flex-1">
+                                         <Input label="Database ID (Gist ID)" value={gistInput} onChange={e => setGistInput(e.target.value)} placeholder="e.g. 8f4b..." />
+                                    </div>
+                                    <div className="mb-3">
+                                        <Button variant="outline" onClick={handleCreateDatabase} disabled={!tokenInput || isSyncing}>
+                                            {isSyncing ? "Creating..." : "Create New DB"}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <p className="text-xs text-slate-400">Click "Create New DB" if you don't have one yet. It will generate an ID for you.</p>
+
+                                <div className="pt-4 border-t flex gap-4">
+                                    <Button variant="github" onClick={saveConfig} className="flex-1">Save Connection Settings</Button>
+                                    <Button variant="secondary" onClick={syncDataFromCloud} disabled={!isOnline}>Force Load Cloud Data</Button>
+                                </div>
+                            </div>
+                        </Card>
+
+                        <Card className="p-8">
+                            <h2 className="font-bold text-lg mb-4">Business Profile</h2>
+                            <Input label="Business Name" value={data.profile.name} onChange={e => updateData('profile', {...data.profile, name: e.target.value})} />
+                            <Input label="Address" value={data.profile.address} onChange={e => updateData('profile', {...data.profile, address: e.target.value})} />
+                            <Button onClick={() => syncDataToCloud()} variant="outline">Save Profile</Button>
+                        </Card>
+                    </div>
+                );
+            };
+
+            const InventoryView = () => {
+                const [newItem, setNewItem] = useState({ name: '', price: '', category: '', stock: '' });
+                const addItem = () => {
+                    const prod = { ...newItem, id: Date.now(), price: Number(newItem.price), stock: Number(newItem.stock) };
+                    updateData('products', [...data.products, prod]);
+                    setNewItem({ name: '', price: '', category: '', stock: '' });
+                };
+
+                return (
+                     <div className="h-full flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold">Inventory</h2>
+                        </div>
+                        <div className="flex gap-6 h-full">
+                            <div className="flex-1 bg-white rounded-xl border overflow-hidden flex flex-col">
+                                <div className="overflow-y-auto flex-1">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-slate-50 border-b"><tr><th className="p-4">Item</th><th className="p-4">Price</th><th className="p-4">Stock</th><th className="p-4">Action</th></tr></thead>
+                                        <tbody className="divide-y">
+                                            {data.products.map(p => (
+                                                <tr key={p.id}>
+                                                    <td className="p-4 font-bold">{p.name}</td>
+                                                    <td className="p-4">₹{p.price}</td>
+                                                    <td className="p-4">{p.stock}</td>
+                                                    <td className="p-4">
+                                                        <button className="text-red-500 hover:text-red-700" onClick={() => updateData('products', data.products.filter(x => x.id !== p.id))}><Icons.Trash/></button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <Card className="w-80 p-6 h-fit">
+                                <h3 className="font-bold mb-4">Add Item</h3>
+                                <Input label="Name" value={newItem.name} onChange={e => setNewItem({...newItem, name: e.target.value})} />
+                                <Input label="Price" type="number" value={newItem.price} onChange={e => setNewItem({...newItem, price: e.target.value})} />
+                                <Input label="Category" value={newItem.category} onChange={e => setNewItem({...newItem, category: e.target.value})} />
+                                <Input label="Stock" type="number" value={newItem.stock} onChange={e => setNewItem({...newItem, stock: e.target.value})} />
+                                <Button className="w-full" onClick={addItem}>Add Product</Button>
+                            </Card>
+                        </div>
+                     </div>
+                );
+            };
+
+            const ReportsView = () => (
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-bold">Reports</h2>
+                        <Button variant="success" onClick={() => downloadCSV(data.sales, 'sales.csv')}><Icons.Download/> Export Sales</Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <Card className="p-6 border-l-4 border-blue-500">
+                            <div className="text-slate-500 text-sm">Total Sales</div>
+                            <div className="text-3xl font-bold">₹{data.sales.reduce((a,b) => a + b.total, 0).toFixed(2)}</div>
+                        </Card>
+                        <Card className="p-6 border-l-4 border-green-500">
+                            <div className="text-slate-500 text-sm">Transactions</div>
+                            <div className="text-3xl font-bold">{data.sales.length}</div>
+                        </Card>
+                        <Card className="p-6 border-l-4 border-purple-500">
+                            <div className="text-slate-500 text-sm">Stock Value</div>
+                            <div className="text-3xl font-bold">₹{data.products.reduce((a,b) => a + (b.price * b.stock), 0).toFixed(2)}</div>
+                        </Card>
+                    </div>
+                    <Card className="overflow-hidden">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50"><tr><th className="p-4">Date</th><th className="p-4">Items</th><th className="p-4">Total</th></tr></thead>
+                            <tbody className="divide-y">
+                                {data.sales.map(s => (
+                                    <tr key={s.id}>
+                                        <td className="p-4">{new Date(s.date).toLocaleDateString()}</td>
+                                        <td className="p-4">{s.items.length} items</td>
+                                        <td className="p-4 font-bold">₹{s.total}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </Card>
+                </div>
+            );
+
+            const ReceiptModal = () => {
+                if (!receiptTx) return null;
+                return (
+                    <Modal isOpen={true} onClose={() => setReceiptTx(null)} title="Receipt">
+                        <div className="font-mono text-sm bg-white p-4 border rounded mb-4">
+                            <div className="text-center mb-4 font-bold uppercase">{data.profile.name}</div>
+                            <div className="flex justify-between text-xs mb-2"><span>{new Date(receiptTx.date).toLocaleString()}</span><span>#{receiptTx.id.slice(-4)}</span></div>
+                            <div className="border-b border-dashed my-2"></div>
+                            {receiptTx.items.map((item, i) => (
+                                <div key={i} className="flex justify-between mb-1">
+                                    <span>{item.quantity} x {item.name}</span>
+                                    <span>{item.price * item.quantity}</span>
+                                </div>
+                            ))}
+                            <div className="border-t border-dashed mt-2 pt-2 flex justify-between font-bold">
+                                <span>TOTAL</span>
+                                <span>₹{receiptTx.total}</span>
+                            </div>
+                        </div>
+                        <Button onClick={() => window.print()} className="w-full"><Icons.Printer/> Print</Button>
+                    </Modal>
+                );
+            };
+
+            // RENDER ROOT
+            if (view === 'login') return <LoginScreen />;
+
+            return (
+                <div className="flex h-screen overflow-hidden">
+                    {/* SIDEBAR */}
+                    <div className="w-64 bg-slate-900 text-slate-300 flex flex-col">
+                        <div className="p-6 text-white font-bold text-xl flex items-center gap-2">
+                            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">P</div>
+                            {data.profile.name}
+                        </div>
+                        <div className="px-6 mb-6">
+                            <div className={`text-xs font-bold flex items-center gap-2 px-3 py-2 rounded ${isOnline ? 'bg-green-900/30 text-green-400' : 'bg-slate-800 text-slate-500'}`}>
+                                {isOnline ? <Icons.CloudCheck size={14}/> : <Icons.CloudOff size={14}/>}
+                                {isOnline ? "Online (GitHub)" : "Local Mode"}
+                            </div>
+                            {isSyncing && <div className="text-[10px] text-blue-400 mt-1 animate-pulse">Syncing...</div>}
+                        </div>
+                        <nav className="flex-1 px-2 space-y-1">
+                            {[
+                                { id: 'pos', icon: Icons.Cart, label: 'Point of Sale' },
+                                { id: 'inventory', icon: Icons.Box, label: 'Inventory' },
+                                { id: 'reports', icon: Icons.Report, label: 'Reports' },
+                                { id: 'settings', icon: Icons.Settings, label: 'Settings' },
+                            ].map(item => (
+                                <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${view === item.id ? 'bg-blue-600 text-white' : 'hover:bg-slate-800'}`}>
+                                    <item.icon size={20}/> {item.label}
+                                </button>
+                            ))}
+                        </nav>
+                        <div className="p-4 border-t border-slate-800">
+                            <button onClick={() => setView('login')} className="flex items-center gap-2 text-red-400 hover:text-red-300 text-sm"><Icons.Logout size={16}/> Logout</button>
+                        </div>
+                    </div>
+
+                    {/* MAIN */}
+                    <main className="flex-1 bg-slate-100 p-6 overflow-hidden relative">
+                        {view === 'pos' && <POSView />}
+                        {view === 'inventory' && <InventoryView />}
+                        {view === 'reports' && <ReportsView />}
+                        {view === 'settings' && <SettingsView />}
+                    </main>
+
+                    <ReceiptModal />
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

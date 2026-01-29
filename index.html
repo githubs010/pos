@@ -86,6 +86,7 @@
             UserPlus: (p) => <Icon {...p} path={<><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></>} />,
             TrendingUp: (p) => <Icon {...p} path={<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>} />,
             TrendingDown: (p) => <Icon {...p} path={<><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></>} />,
+            Refresh: (p) => <Icon {...p} path={<><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
         };
 
         // --- COMPONENTS ---
@@ -190,7 +191,29 @@
             const [view, setView] = useState('login'); 
             const [activeUser, setActiveUser] = useState(null);
             const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
-            const [data, setData] = useState(() => JSON.parse(localStorage.getItem('pos_data')) || DEFAULT_DATA);
+            
+            // --- SMART DATA INIT (MIGRATION LOGIC) ---
+            const [data, setData] = useState(() => {
+                try {
+                    const local = JSON.parse(localStorage.getItem('pos_data'));
+                    // If no data, use default
+                    if (!local) return DEFAULT_DATA;
+                    
+                    // MIGRATION: If legacy data exists (has 'staff' or missing 'users')
+                    if (!local.users || !Array.isArray(local.users)) {
+                        console.log("Migrating legacy data structure...");
+                        return {
+                            ...DEFAULT_DATA, // Load defaults first (includes admin user)
+                            ...local,        // Override with saved data (products, etc.)
+                            users: DEFAULT_DATA.users // Ensure users array exists with default admin
+                        };
+                    }
+                    return local;
+                } catch (e) {
+                    return DEFAULT_DATA;
+                }
+            });
+
             const [isOnline, setIsOnline] = useState(false);
             const [isSyncing, setIsSyncing] = useState(false);
 
@@ -234,12 +257,50 @@
             };
 
             const handleLogin = (username, password) => {
+                if(!data.users) {
+                    if(username === 'admin' && password === '123') {
+                        setData(DEFAULT_DATA); 
+                        setActiveUser(DEFAULT_DATA.users[0]);
+                        setView('pos');
+                        alert("System Reset & Logged In");
+                        return;
+                    }
+                }
                 const user = data.users.find(u => u.username === username && u.password === password);
                 if (user) {
                     setActiveUser(user);
                     setView('pos');
                 } else {
-                    alert("Invalid Credentials");
+                    alert("Invalid Credentials.");
+                }
+            };
+
+            const handleRegister = (name, username, password) => {
+                if (!name || !username || !password) return alert("Please fill all fields");
+                if (data.users && data.users.some(u => u.username === username)) return alert("Username taken");
+                
+                const newUser = { 
+                    id: Date.now(), 
+                    name, 
+                    username, 
+                    password, 
+                    role: 'Admin' // First created user via signup is Admin
+                };
+                
+                const currentUsers = data.users || [];
+                const newData = { ...data, users: [...currentUsers, newUser] };
+                setData(newData);
+                syncDataToCloud(newData);
+                setActiveUser(newUser);
+                setView('pos');
+                alert("Account Created & Logged In!");
+            };
+
+            const fullReset = () => {
+                if(confirm("Warning: This will delete LOCAL data and reset to defaults. Use this if login is broken. Continue?")) {
+                    localStorage.clear();
+                    setData(DEFAULT_DATA);
+                    alert("System Reset. Try logging in with admin / 123");
                 }
             };
 
@@ -283,25 +344,49 @@
 
             // --- VIEWS ---
             const LoginView = () => {
-                const [creds, setCreds] = useState({ u: '', p: '' });
+                const [isRegistering, setIsRegistering] = useState(false);
+                const [creds, setCreds] = useState({ name: '', u: '', p: '' });
+
                 return (
                     <div className="min-h-screen flex items-center justify-center p-4">
-                        <div className="glass p-8 rounded-3xl w-full max-w-sm text-center shadow-2xl animate-in">
+                        <div className="glass p-8 rounded-3xl w-full max-w-sm text-center shadow-2xl animate-in relative">
                             <div className="w-20 h-20 bg-gradient-to-tr from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/40 text-white">
                                 <Icons.Box size={40}/>
                             </div>
-                            <h1 className="text-3xl font-bold mb-1 text-slate-800">{data.profile.name}</h1>
-                            <p className="text-slate-500 mb-8 font-medium">Secure Login</p>
+                            <h1 className="text-3xl font-bold mb-1 text-slate-800">{data.profile?.name || "POS System"}</h1>
+                            <p className="text-slate-500 mb-8 font-medium">{isRegistering ? "Create New Account" : "Secure Login"}</p>
                             
+                            {isRegistering && (
+                                <Input placeholder="Full Name" value={creds.name} onChange={e => setCreds({...creds, name: e.target.value})} />
+                            )}
                             <Input placeholder="Username" value={creds.u} onChange={e => setCreds({...creds, u: e.target.value})} />
                             <Input type="password" placeholder="Password" value={creds.p} onChange={e => setCreds({...creds, p: e.target.value})} />
                             
-                            <Button className="w-full py-3 text-lg" onClick={() => handleLogin(creds.u, creds.p)}>Login Access</Button>
+                            {isRegistering ? (
+                                <Button className="w-full py-3 text-lg" onClick={() => handleRegister(creds.name, creds.u, creds.p)}>Sign Up & Login</Button>
+                            ) : (
+                                <Button className="w-full py-3 text-lg" onClick={() => handleLogin(creds.u, creds.p)}>Login Access</Button>
+                            )}
                             
                             <div className="mt-6 text-xs text-slate-500">
-                                Default Admin: admin / 123 <br/>
-                                Default Staff: staff / 123
+                                {isRegistering ? (
+                                    <p>Already have an account? <button onClick={() => setIsRegistering(false)} className="text-indigo-600 font-bold hover:underline">Login</button></p>
+                                ) : (
+                                    <p>New here? <button onClick={() => setIsRegistering(true)} className="text-indigo-600 font-bold hover:underline">Create Account</button></p>
+                                )}
                             </div>
+
+                            {!isRegistering && (
+                                <>
+                                    <div className="mt-4 text-xs text-slate-400">
+                                        Default Admin: admin / 123 <br/>
+                                        Default Staff: staff / 123
+                                    </div>
+                                    <button onClick={fullReset} className="mt-6 text-xs text-red-400 hover:text-red-600 flex items-center justify-center gap-1 mx-auto opacity-60 hover:opacity-100 transition-opacity">
+                                        <Icons.Refresh size={10}/> Reset System (Fix Login)
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 );

@@ -15,6 +15,10 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- jsPDF & AutoTable for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
     
@@ -53,6 +57,76 @@
         
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        /* PRINT STYLES - FIXED FOR BLANK PAGE ISSUE */
+        @media print {
+            /* Reset Page */
+            @page { margin: 0; size: auto; }
+            body, html { 
+                background: white !important; 
+                height: 100% !important; 
+                width: 100% !important;
+                overflow: visible !important;
+            }
+
+            /* Hide the Main App Interface */
+            #main-interface { 
+                display: none !important; 
+            }
+
+            /* Reset the Modal Wrapper to be the Print Container */
+            .fixed.inset-0 {
+                position: static !important;
+                display: block !important;
+                background: white !important;
+                width: 100% !important;
+                height: auto !important;
+                z-index: 9999 !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* Reset Glass Effect for Print */
+            .glass, .glass-card {
+                background: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                backdrop-filter: none !important;
+                position: static !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* Hide Header and Footer of Modal */
+            .glass > .flex.justify-between, /* The modal header row */
+            .no-print { /* The buttons at bottom */
+                display: none !important;
+            }
+
+            /* Ensure Modal Content Area allows overflow */
+            .p-5.max-h-\[80vh\] {
+                max-height: none !important;
+                overflow: visible !important;
+                padding: 0 !important;
+            }
+
+            /* Style the Receipt specifically */
+            #receipt-printable {
+                display: block !important;
+                visibility: visible !important;
+                width: 80mm !important; /* Force Thermal Width */
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 10px !important;
+                border: none !important;
+                box-shadow: none !important;
+                color: black !important;
+                font-family: monospace !important;
+            }
+            
+            /* Force text color black */
+            * { color: black !important; text-shadow: none !important; }
+        }
     </style>
 </head>
 <body class="text-slate-800 antialiased selection:bg-indigo-500 selection:text-white">
@@ -87,6 +161,7 @@
             TrendingUp: (p) => <Icon {...p} path={<><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></>} />,
             TrendingDown: (p) => <Icon {...p} path={<><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></>} />,
             Refresh: (p) => <Icon {...p} path={<><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></>} />,
+            FileText: (p) => <Icon {...p} path={<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>} />,
         };
 
         // --- COMPONENTS ---
@@ -126,6 +201,120 @@
                     </div>
                 </div>
             );
+        };
+
+        // --- PDF GENERATORS ---
+        const generateReceiptPDF = (tx, profile) => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: [80, 200] // Approximate thermal printer width
+            });
+
+            let y = 10;
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(profile.name || "Business Name", 40, y, { align: 'center' });
+            y += 6;
+            
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            if(profile.address) { doc.text(profile.address, 40, y, { align: 'center' }); y += 4; }
+            if(profile.location) { doc.text(profile.location, 40, y, { align: 'center' }); y += 4; }
+            if(profile.phone) { doc.text(`Tel: ${profile.phone}`, 40, y, { align: 'center' }); y += 4; }
+            if(profile.gst) { doc.text(`GST No: ${profile.gst}`, 40, y, { align: 'center' }); y += 4; }
+            if(profile.type) { doc.text(`(${profile.type})`, 40, y, { align: 'center' }); y += 4; }
+            
+            doc.text("-".repeat(45), 40, y, { align: 'center' });
+            y += 4;
+
+            doc.text(`Date: ${new Date(tx.date).toLocaleDateString()}`, 5, y);
+            y += 4;
+            doc.text(`Time: ${new Date(tx.date).toLocaleTimeString()}`, 5, y);
+            y += 4;
+            doc.text(`Bill No: ${tx.id.slice(-6)}`, 5, y);
+            y += 5;
+
+            // Headers
+            doc.setFont(undefined, 'bold');
+            doc.text("Item", 5, y);
+            doc.text("Qty", 45, y);
+            doc.text("Price", 60, y);
+            y += 4;
+            doc.setFont(undefined, 'normal');
+            
+            tx.items.forEach(item => {
+                let name = item.name.length > 15 ? item.name.substring(0,15)+"..." : item.name;
+                doc.text(name, 5, y);
+                doc.text(item.quantity.toString(), 48, y, { align: 'center' });
+                doc.text((item.price * item.quantity).toFixed(2), 75, y, { align: 'right' });
+                y += 4;
+            });
+
+            doc.text("-".repeat(45), 40, y, { align: 'center' });
+            y += 4;
+            
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(`Total: ${tx.total.toFixed(2)}`, 75, y, { align: 'right' });
+            
+            y += 8;
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'italic');
+            doc.text("Thank you for your business!", 40, y, { align: 'center' });
+
+            doc.save(`Receipt_${tx.id.slice(-6)}.pdf`);
+        };
+
+        const generateReportPDF = (data, title, type, profile) => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Header
+            doc.setFontSize(18);
+            doc.text(profile.name || "Business Name", 14, 15);
+            doc.setFontSize(10);
+            if(profile.address) doc.text(profile.address, 14, 20);
+            if(profile.gst) doc.text(`GST: ${profile.gst}`, 14, 25);
+
+            doc.setFontSize(14);
+            doc.text(title, 14, 35);
+            doc.setFontSize(10);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 40);
+
+            let columns = [];
+            let body = [];
+
+            if (type === 'sales') {
+                columns = ["Date", "Tx ID", "Items", "Cashier", "Total"];
+                body = data.map(row => [
+                    new Date(row.date).toLocaleDateString() + ' ' + new Date(row.date).toLocaleTimeString(),
+                    row.id,
+                    row.items.length,
+                    row.cashier,
+                    row.total.toFixed(2)
+                ]);
+            } else if (type === 'stockIn' || type === 'stockOut') {
+                columns = ["Date", "Type", "Product", "Qty", "Reason"];
+                body = data.map(row => [
+                    new Date(row.date).toLocaleDateString(),
+                    row.type,
+                    row.prodName,
+                    row.qty,
+                    row.reason
+                ]);
+            }
+
+            doc.autoTable({
+                head: [columns],
+                body: body,
+                startY: 45,
+                theme: 'grid',
+                headStyles: { fillColor: [79, 70, 229] } // Indigo color
+            });
+
+            doc.save(`${type}_report.pdf`);
         };
 
         // --- GITHUB API ---
@@ -183,7 +372,15 @@
             customers: [],
             sales: [],
             stockLog: [],
-            profile: { name: "Glass POS", address: "Cloud City", phone: "555-0101" }
+            profile: { 
+                name: "Glass POS", 
+                address: "Cloud City", 
+                phone: "555-0101", 
+                logo: "", // Placeholder for logo URL
+                location: "Main Street", 
+                gst: "GSTIN12345", 
+                type: "Retail" 
+            }
         };
 
         // --- MAIN APPLICATION ---
@@ -196,19 +393,20 @@
             const [data, setData] = useState(() => {
                 try {
                     const local = JSON.parse(localStorage.getItem('pos_data'));
-                    // If no data, use default
                     if (!local) return DEFAULT_DATA;
                     
-                    // MIGRATION: If legacy data exists (has 'staff' or missing 'users')
+                    let migrated = { ...local };
+                    
+                    // Migration 1: Users
                     if (!local.users || !Array.isArray(local.users)) {
-                        console.log("Migrating legacy data structure...");
-                        return {
-                            ...DEFAULT_DATA, // Load defaults first (includes admin user)
-                            ...local,        // Override with saved data (products, etc.)
-                            users: DEFAULT_DATA.users // Ensure users array exists with default admin
-                        };
+                        migrated.users = DEFAULT_DATA.users;
                     }
-                    return local;
+                    // Migration 2: Enhanced Profile
+                    if (!local.profile || !local.profile.gst) {
+                        migrated.profile = { ...DEFAULT_DATA.profile, ...local.profile };
+                    }
+                    
+                    return migrated;
                 } catch (e) {
                     return DEFAULT_DATA;
                 }
@@ -253,7 +451,7 @@
             const updateData = (key, value) => {
                 const newData = { ...data, [key]: value };
                 setData(newData);
-                if (['products', 'sales', 'stockLog', 'users'].includes(key)) syncDataToCloud(newData);
+                if (['products', 'sales', 'stockLog', 'users', 'profile'].includes(key)) syncDataToCloud(newData);
             };
 
             const handleLogin = (username, password) => {
@@ -377,15 +575,9 @@
                             </div>
 
                             {!isRegistering && (
-                                <>
-                                    <div className="mt-4 text-xs text-slate-400">
-                                        Default Admin: admin / 123 <br/>
-                                        Default Staff: staff / 123
-                                    </div>
-                                    <button onClick={fullReset} className="mt-6 text-xs text-red-400 hover:text-red-600 flex items-center justify-center gap-1 mx-auto opacity-60 hover:opacity-100 transition-opacity">
-                                        <Icons.Refresh size={10}/> Reset System (Fix Login)
-                                    </button>
-                                </>
+                                <button onClick={fullReset} className="mt-6 text-xs text-red-400 hover:text-red-600 flex items-center justify-center gap-1 mx-auto opacity-60 hover:opacity-100 transition-opacity">
+                                    <Icons.Refresh size={10}/> Reset System (Fix Login)
+                                </button>
                             )}
                         </div>
                     </div>
@@ -397,7 +589,7 @@
                 const total = cart.reduce((sum, i) => sum + (i.price * i.quantity), 0);
 
                 return (
-                    <div className="flex h-full gap-6">
+                    <div id="main-interface" className="flex h-full gap-6">
                         <div className="flex-1 flex flex-col">
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-2xl font-bold text-slate-800">Point of Sale</h2>
@@ -475,7 +667,7 @@
                 const filteredStockOut = filterByDate(data.stockLog.filter(l => l.type === 'OUT'));
 
                 return (
-                    <div className="h-full flex flex-col">
+                    <div id="main-interface" className="h-full flex flex-col">
                         <div className="flex justify-between items-end mb-6">
                             <div>
                                 <h2 className="text-2xl font-bold mb-1">Reports & Analytics</h2>
@@ -510,7 +702,8 @@
                                 </button>
                             ))}
                             <div className="flex-1"></div>
-                            <Button size="sm" variant="secondary" onClick={() => downloadCSV(tab === 'sales' ? filteredSales : tab === 'stockIn' ? filteredStockIn : filteredStockOut, 'report.csv')}><Icons.Download size={16}/> Export CSV</Button>
+                            <Button size="sm" variant="secondary" onClick={() => downloadCSV(tab === 'sales' ? filteredSales : tab === 'stockIn' ? filteredStockIn : filteredStockOut, 'report.csv')}><Icons.Download size={16}/> CSV</Button>
+                            <Button size="sm" onClick={() => generateReportPDF(tab === 'sales' ? filteredSales : tab === 'stockIn' ? filteredStockIn : filteredStockOut, `${tab} Report`, tab, data.profile)}><Icons.FileText size={16}/> PDF</Button>
                         </div>
 
                         <div className="flex-1 glass-card rounded-2xl overflow-hidden flex flex-col">
@@ -529,7 +722,7 @@
                                             <tr key={i} className="hover:bg-white/30 transition-colors">
                                                 <td className="p-4 text-slate-500 font-mono text-xs">{new Date(row.date).toLocaleString()}</td>
                                                 <td className="p-4 font-medium text-slate-800">{tab === 'sales' ? row.id : row.prodName}</td>
-                                                <td className="p-4 font-bold">{tab === 'sales' ? `₹${row.total}` : row.qty}</td>
+                                                <td className="p-4 font-bold">{tab === 'sales' ? `₹${row.total.toFixed(2)}` : row.qty}</td>
                                                 <td className="p-4 text-slate-500">{tab === 'sales' ? row.cashier : row.reason}</td>
                                             </tr>
                                         ))}
@@ -554,7 +747,7 @@
                 };
 
                 return (
-                    <div className="flex gap-6 h-full">
+                    <div id="main-interface" className="flex gap-6 h-full">
                         <div className="flex-1 flex flex-col">
                              <h2 className="text-2xl font-bold mb-6">User Management</h2>
                              <div className="flex-1 glass-card rounded-2xl overflow-hidden">
@@ -605,7 +798,7 @@
                 };
 
                 return (
-                    <div className="flex gap-6 h-full">
+                    <div id="main-interface" className="flex gap-6 h-full">
                         <div className="flex-1 flex flex-col">
                             <h2 className="text-2xl font-bold mb-6">Inventory</h2>
                             <div className="flex-1 glass-card rounded-2xl overflow-y-auto">
@@ -638,6 +831,7 @@
             const SettingsView = () => {
                 const [token, setToken] = useState(ghConfig.token);
                 const [gist, setGist] = useState(ghConfig.gistId);
+                const [profile, setProfile] = useState(data.profile);
 
                 const createDB = async () => {
                     const g = await createGist(token, "POS DB", data);
@@ -645,21 +839,45 @@
                     alert("Database Created!");
                 };
 
+                const saveProfile = () => {
+                    updateData('profile', profile);
+                    alert("Profile Saved!");
+                };
+
                 return (
-                    <div className="max-w-2xl mx-auto space-y-6">
-                        <Card>
-                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.Github/> Cloud Database</h2>
-                            <p className="text-sm text-slate-500 mb-4">Connect to GitHub Gists to save data online for free.</p>
-                            <Input label="GitHub Token" type="password" value={token} onChange={e => setToken(e.target.value)} />
-                            <div className="flex gap-4 items-end mb-4">
-                                <div className="flex-1"><Input label="Database ID" value={gist} onChange={e => setGist(e.target.value)} /></div>
-                                <div className="mb-4"><Button onClick={createDB} disabled={!token}>Create New</Button></div>
-                            </div>
-                            <div className="flex gap-4">
-                                <Button className="flex-1" onClick={() => setGhConfig({token, gistId: gist})}>Save Config</Button>
-                                <Button variant="secondary" onClick={syncDataFromCloud} disabled={!isOnline}>Force Load</Button>
-                            </div>
-                        </Card>
+                    <div id="main-interface" className="max-w-4xl mx-auto space-y-6 overflow-y-auto h-full pb-10">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Connection Card */}
+                            <Card>
+                                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.Github/> Cloud Database</h2>
+                                <p className="text-sm text-slate-500 mb-4">Connect to GitHub Gists to save data online for free.</p>
+                                <Input label="GitHub Token" type="password" value={token} onChange={e => setToken(e.target.value)} />
+                                <div className="flex gap-4 items-end mb-4">
+                                    <div className="flex-1"><Input label="Database ID" value={gist} onChange={e => setGist(e.target.value)} /></div>
+                                    <div className="mb-4"><Button onClick={createDB} disabled={!token}>Create New</Button></div>
+                                </div>
+                                <div className="flex gap-4">
+                                    <Button className="flex-1" onClick={() => setGhConfig({token, gistId: gist})}>Save Config</Button>
+                                    <Button variant="secondary" onClick={syncDataFromCloud} disabled={!isOnline}>Force Load</Button>
+                                </div>
+                            </Card>
+
+                            {/* Business Profile Card */}
+                            <Card>
+                                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icons.Settings/> Business Profile</h2>
+                                <p className="text-sm text-slate-500 mb-4">Details for Receipts & Reports.</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="col-span-2"><Input label="Business Name" value={profile.name} onChange={e => setProfile({...profile, name: e.target.value})} /></div>
+                                    <Input label="Business Type" value={profile.type} onChange={e => setProfile({...profile, type: e.target.value})} />
+                                    <Input label="Contact Number" value={profile.phone} onChange={e => setProfile({...profile, phone: e.target.value})} />
+                                    <div className="col-span-2"><Input label="Address" value={profile.address} onChange={e => setProfile({...profile, address: e.target.value})} /></div>
+                                    <Input label="Location/City" value={profile.location} onChange={e => setProfile({...profile, location: e.target.value})} />
+                                    <Input label="GST / Tax ID" value={profile.gst} onChange={e => setProfile({...profile, gst: e.target.value})} />
+                                    <div className="col-span-2"><Input label="Logo URL (Optional)" value={profile.logo} onChange={e => setProfile({...profile, logo: e.target.value})} placeholder="https://..." /></div>
+                                </div>
+                                <Button className="w-full mt-2" onClick={saveProfile}>Save Business Profile</Button>
+                            </Card>
+                        </div>
                     </div>
                 );
             };
@@ -667,22 +885,63 @@
             const Receipt = () => {
                 if(!receiptTx) return null;
                 return (
-                    <Modal isOpen={true} onClose={() => setReceiptTx(null)} title="Receipt">
-                        <div className="bg-white p-6 font-mono text-sm border rounded shadow-sm">
-                            <div className="text-center font-bold text-lg mb-1">{data.profile.name}</div>
-                            <div className="text-center text-xs text-slate-500 mb-4">{new Date(receiptTx.date).toLocaleString()}</div>
-                            <div className="border-b border-dashed border-slate-300 mb-4"></div>
-                            {receiptTx.items.map((i,idx) => (
-                                <div key={idx} className="flex justify-between mb-2">
-                                    <span>{i.quantity} x {i.name}</span>
-                                    <span>{i.quantity * i.price}</span>
+                    <Modal isOpen={true} onClose={() => setReceiptTx(null)} title="Receipt Generated">
+                        <div id="receipt-printable" className="bg-white p-4 font-mono text-sm border rounded shadow-sm text-center relative">
+                            {/* Header for Print (Hidden visually in 'Success' mode if we want, but let's show it for clarity) */}
+                            <div className="mb-4">
+                                <h2 className="font-bold text-xl uppercase">{data.profile.name}</h2>
+                                <p className="text-xs text-slate-500">{data.profile.address}</p>
+                                <p className="text-xs text-slate-500">{data.profile.phone}</p>
+                            </div>
+                            
+                            <div className="border-b border-dashed border-slate-300 my-2"></div>
+                            
+                            <div className="text-left text-xs mb-4 space-y-1">
+                                <div className="flex justify-between"><span>Date:</span> <span>{new Date(receiptTx.date).toLocaleDateString()}</span></div>
+                                <div className="flex justify-between"><span>Time:</span> <span>{new Date(receiptTx.date).toLocaleTimeString()}</span></div>
+                                <div className="flex justify-between"><span>TxID:</span> <span>{receiptTx.id.slice(-6)}</span></div>
+                                <div className="flex justify-between"><span>Cashier:</span> <span>{receiptTx.cashier}</span></div>
+                            </div>
+
+                            <div className="border-b border-dashed border-slate-300 my-2"></div>
+
+                            <div className="text-left mb-4">
+                                <div className="flex justify-between font-bold text-xs mb-2">
+                                    <span>Item</span>
+                                    <span>Amt</span>
                                 </div>
-                            ))}
-                            <div className="border-t border-dashed border-slate-300 mt-4 pt-4 flex justify-between font-bold text-lg">
-                                <span>TOTAL</span><span>₹{receiptTx.total}</span>
+                                {receiptTx.items.map((item, i) => (
+                                    <div key={i} className="flex justify-between text-xs mb-1">
+                                        <span>{item.quantity} x {item.name}</span>
+                                        <span>{(item.price * item.quantity).toFixed(2)}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="border-t border-dashed border-slate-300 pt-2">
+                                <div className="flex justify-between font-bold text-lg">
+                                    <span>TOTAL</span>
+                                    <span>₹{receiptTx.total.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-6 text-center text-xs text-slate-400">
+                                Thank you for your business!
                             </div>
                         </div>
-                        <Button className="w-full mt-4" onClick={() => window.print()}>Print Receipt</Button>
+                        
+                        {/* Actions - Hidden when printing */}
+                        <div className="flex flex-col gap-3 mt-6 no-print">
+                            <div className="flex gap-3">
+                                <Button className="flex-1" onClick={() => window.print()}>
+                                    <Icons.Printer size={18}/> Print Now
+                                </Button>
+                                <Button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" onClick={() => generateReceiptPDF(receiptTx, data.profile)}>
+                                    <Icons.Download size={18}/> PDF
+                                </Button>
+                            </div>
+                            <Button variant="secondary" onClick={() => setReceiptTx(null)}>Close Window</Button>
+                        </div>
                     </Modal>
                 );
             };
@@ -692,7 +951,7 @@
             return (
                 <div className="flex h-screen overflow-hidden text-sm">
                     {/* Sidebar */}
-                    <div className="w-64 glass-dark text-white flex flex-col z-20 shadow-2xl">
+                    <div id="main-interface" className="w-64 glass-dark text-white flex flex-col z-20 shadow-2xl">
                         <div className="p-6">
                             <h1 className="text-xl font-bold flex items-center gap-2"><span className="bg-indigo-500 p-1 rounded">GL</span> POS</h1>
                             <div className={`mt-4 text-xs px-3 py-1.5 rounded-lg flex items-center gap-2 ${isOnline ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-white/10 text-slate-400'}`}>
@@ -741,7 +1000,7 @@
                     </div>
 
                     {/* Main Content */}
-                    <div className="flex-1 p-6 overflow-hidden relative">
+                    <div id="main-interface" className="flex-1 p-6 overflow-hidden relative">
                         {/* Background Blobs for Glass Effect */}
                         <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -z-10 animate-blob"></div>
                         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-3xl opacity-20 -z-10 animate-blob animation-delay-2000"></div>

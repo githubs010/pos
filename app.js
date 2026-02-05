@@ -108,7 +108,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v3');
+        const saved = localStorage.getItem('pos_data_v4'); // Incremented version to ensure fresh load if needed
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -132,7 +132,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v3', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v4', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -202,7 +202,6 @@ function App() {
         setCart([]);
     };
 
-    // --- PRINT HANDLER ---
     const handlePrint = (tx) => {
         const printContent = `
             <div style="font-family: monospace; text-align: center; width: 100%; max-width: 300px; margin: 0 auto; color: black; padding: 10px;">
@@ -245,8 +244,6 @@ function App() {
                 <p style="font-size: 10px; margin-top: 5px;">Thank you! Visit Again.</p>
             </div>
         `;
-        
-        // Inject content into the hidden print area
         const printArea = document.getElementById('print-area');
         if(printArea) {
             printArea.innerHTML = printContent;
@@ -289,56 +286,108 @@ function App() {
         </div>
     );
 
+    // --- REVISED POS VIEW (SPLIT SCREEN FOR DESKTOP) ---
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+        
+        const currentTotal = cart.reduce((a,b) => a + (b.price * b.quantity), 0);
+
         return (
-            <div className="flex flex-col h-full animate-in pb-32 lg:pb-0">
-                <div className="flex gap-4 mb-6 sticky top-0 bg-[#0f111a]/90 backdrop-blur-md z-10 py-2">
-                    <div className="relative flex-1">
-                        <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
-                        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-surface-dark border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-colors text-sm text-white"/>
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 overflow-y-auto pr-1">
-                    {filtered.map(p => (
-                        <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
-                            const ex = prev.find(i => i.id === p.id);
-                            return ex ? prev.map(i => i.id === p.id ? {...i, quantity: i.quantity+1}:i) : [...prev, {...p, quantity:1}];
-                        })} disabled={p.stock <= 0} className="glass-card p-4 rounded-2xl flex flex-col items-start text-left hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all relative overflow-hidden group border-white/5">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-3 text-indigo-300 group-hover:text-white transition-colors">
-                                <span className="font-bold text-lg">{p.name[0]}</span>
-                            </div>
-                            <div className="font-bold text-white leading-tight mb-1">{p.name}</div>
-                            <div className="text-xs text-gray-400 mb-2">{p.stock} in stock</div>
-                            <div className="font-mono text-primary font-bold">₹{p.price.toFixed(2)}</div>
-                            {p.stock <= 0 && <div className="absolute top-2 right-2 bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded font-bold">OUT</div>}
-                        </button>
-                    ))}
-                </div>
-                {cart.length > 0 && (
-                    <div className="lg:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
-                        <div className="glass-panel-heavy p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary relative">
-                                    <Icon name="shopping_bag" size={20}/>
-                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-gray-400 font-medium">Total</div>
-                                    <div className="font-bold text-white">₹{cart.reduce((a,b)=>a+(b.price*b.quantity),0).toFixed(2)}</div>
-                                </div>
-                            </div>
-                            <Button onClick={checkout} size="sm">Gen Bill</Button>
+            <div className="flex h-full animate-in overflow-hidden">
+                {/* Left Side: Products (Full width on Mobile, Flexible on Desktop) */}
+                <div className="flex-1 flex flex-col h-full relative">
+                    <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10">
+                        <div className="relative flex-1">
+                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
+                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-surface-dark border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-colors text-sm text-white"/>
                         </div>
                     </div>
-                )}
+                    
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 lg:pb-4">
+                        {filtered.map(p => (
+                            <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
+                                const ex = prev.find(i => i.id === p.id);
+                                return ex ? prev.map(i => i.id === p.id ? {...i, quantity: i.quantity+1}:i) : [...prev, {...p, quantity:1}];
+                            })} disabled={p.stock <= 0} className="glass-card p-4 rounded-2xl flex flex-col items-start text-left hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all relative overflow-hidden group border-white/5">
+                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-3 text-indigo-300 group-hover:text-white transition-colors">
+                                    <span className="font-bold text-lg">{p.name[0]}</span>
+                                </div>
+                                <div className="font-bold text-white leading-tight mb-1">{p.name}</div>
+                                <div className="text-xs text-gray-400 mb-2">{p.stock} in stock</div>
+                                <div className="font-mono text-primary font-bold">₹{p.price.toFixed(2)}</div>
+                                {p.stock <= 0 && <div className="absolute top-2 right-2 bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded font-bold">OUT</div>}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Mobile Only Floating Cart */}
+                    {cart.length > 0 && (
+                        <div className="lg:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
+                            <div className="glass-panel-heavy p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary relative">
+                                        <Icon name="shopping_bag" size={20}/>
+                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-400 font-medium">Total</div>
+                                        <div className="font-bold text-white">₹{currentTotal.toFixed(2)}</div>
+                                    </div>
+                                </div>
+                                <Button onClick={checkout} size="sm">Gen Bill</Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Side: Desktop Billing Sidebar (Hidden on Mobile) */}
+                <div className="hidden lg:flex w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full">
+                    <div className="p-6 border-b border-white/5">
+                        <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        {cart.length === 0 ? (
+                             <div className="h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
+                                <Icon name="shopping_cart_off" size={48} className="mb-2"/>
+                                <p>Cart is empty</p>
+                             </div>
+                        ) : (
+                             cart.map(item => (
+                                <div key={item.id} className="glass-card p-3 rounded-xl flex items-center justify-between group">
+                                    <div>
+                                        <div className="font-bold text-white text-sm">{item.name}</div>
+                                        <div className="text-xs text-gray-400">₹{item.price} x {item.quantity}</div>
+                                    </div>
+                                    <div className="font-bold text-primary">₹{(item.price * item.quantity).toFixed(2)}</div>
+                                </div>
+                             ))
+                        )}
+                    </div>
+
+                    <div className="p-6 bg-black/20 border-t border-white/5">
+                        <div className="space-y-2 mb-4">
+                            <div className="flex justify-between text-sm text-gray-400">
+                                <span>Items</span>
+                                <span>{cart.reduce((a,b)=>a+b.quantity,0)}</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-bold text-white">
+                                <span>Total</span>
+                                <span>₹{currentTotal.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <Button onClick={checkout} className="w-full py-4 text-base" disabled={cart.length===0}>
+                            Generate Bill & Print
+                        </Button>
+                    </div>
+                </div>
             </div>
         );
     };
 
     const InventoryView = () => (
-        <div className="animate-in pb-24 lg:pb-0">
+        <div className="animate-in pb-24 lg:pb-0 p-4 lg:p-8 overflow-y-auto h-full">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <Button onClick={() => {
@@ -375,11 +424,10 @@ function App() {
 
     const ReportsView = () => {
         const [reportType, setReportType] = useState('sales'); 
-
         return (
-            <div className="animate-in flex flex-col gap-6 pb-24 lg:pb-0">
+            <div className="animate-in flex flex-col gap-6 pb-24 lg:pb-0 p-4 lg:p-8 overflow-y-auto h-full">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-2xl font-bold">Analytics & Reports</h2>
+                    <h2 className="text-2xl font-bold">Analytics</h2>
                     <div className="flex gap-2 bg-surface-dark p-1 rounded-lg">
                         <button onClick={()=>setReportType('sales')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='sales' ? 'bg-primary text-white' : 'text-gray-400'}`}>Sales</button>
                         <button onClick={()=>setReportType('stock')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='stock' ? 'bg-primary text-white' : 'text-gray-400'}`}>Stock</button>
@@ -410,7 +458,7 @@ function App() {
                 ) : (
                     <div className="glass-card p-4 rounded-2xl h-[500px] flex flex-col">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold">Stock Movement (IN/OUT)</h3>
+                            <h3 className="font-bold">Stock Movement</h3>
                             <Button size="sm" onClick={() => generateStockReportPDF(data.stockLog, data.profile)}><Icon name="download" size={16}/> PDF</Button>
                         </div>
                         <div className="overflow-y-auto flex-1">
@@ -446,7 +494,7 @@ function App() {
     const UsersView = () => {
          const [newUser, setNewUser] = useState({ name: '', username: '', password: '', role: 'Staff' });
          return (
-             <div className="animate-in h-full overflow-y-auto pb-24 lg:pb-0">
+             <div className="animate-in h-full overflow-y-auto pb-24 lg:pb-0 p-4 lg:p-8">
                  <h2 className="text-2xl font-bold mb-6">User Management</h2>
                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                      <div className="lg:col-span-3 space-y-3">
@@ -480,7 +528,7 @@ function App() {
     };
 
     const SettingsView = () => (
-        <div className="animate-in h-full overflow-y-auto pb-24 lg:pb-0">
+        <div className="animate-in h-full overflow-y-auto pb-24 lg:pb-0 p-4 lg:p-8">
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
              <div className="ref-card p-6 rounded-2xl mb-6">
                 <h3 className="font-bold mb-4">Business Profile</h3>
@@ -527,7 +575,7 @@ function App() {
                     <button onClick={() => setView('settings')}><Icon name="settings"/></button>
                 </header>
 
-                <div className="flex-1 overflow-y-auto p-4 lg:p-8 no-scrollbar">
+                <div className="flex-1 overflow-hidden h-full">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && <InventoryView />}
                     {view === 'reports' && <ReportsView />}

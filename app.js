@@ -87,12 +87,12 @@ function App() {
     const [isSyncing, setIsSyncing] = useState(false);
     
     // UI State
-    const [showMobileCart, setShowMobileCart] = useState(false); // Mobile Cart Modal
+    const [showMobileCart, setShowMobileCart] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v13'); 
+        const saved = localStorage.getItem('pos_data_v14'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v13', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v14', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -125,7 +125,6 @@ function App() {
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
     
-    // --- CART ACTIONS ---
     const updateCartQty = (itemId, delta) => {
         setCart(prev => {
             return prev.map(item => {
@@ -172,7 +171,7 @@ function App() {
         setData(prev => ({ ...prev, products: newProducts, sales: [tx, ...prev.sales], stockLog: [...newLogs, ...prev.stockLog] }));
         setReceiptTx(tx);
         setCart([]);
-        setShowMobileCart(false); // Close mobile cart if open
+        setShowMobileCart(false);
     };
 
     const handlePrint = (tx) => {
@@ -291,11 +290,10 @@ function App() {
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
                             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-surface-dark border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-colors text-sm text-white"/>
                         </div>
-                        {user.role === 'Admin' && <button onClick={()=>setView('settings')} className="md:hidden p-3 bg-surface-dark rounded-xl text-gray-400"><Icon name="settings"/></button>}
                     </div>
 
                     {/* Product Grid */}
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-48 md:pb-4 no-scrollbar">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 md:pb-4 no-scrollbar">
                         {filtered.map(p => (
                             <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
                                 const ex = prev.find(i => i.id === p.id);
@@ -314,9 +312,8 @@ function App() {
                     
                     {/* --- MOBILE FLOATING UI --- */}
                     {cart.length > 0 && (
-                        <div className="md:hidden fixed bottom-28 left-4 right-4 z-50 animate-in">
+                        <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 animate-in">
                             <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/5">
-                                {/* Click Area to Open Cart Modal */}
                                 <div className="flex items-center gap-3 active:scale-95 transition-transform" onClick={() => setShowMobileCart(true)}>
                                     <div className="w-12 h-12 bg-[#2b2b40] rounded-full flex items-center justify-center text-[#6366f1] relative">
                                         <Icon name="shopping_bag" size={24}/>
@@ -331,27 +328,6 @@ function App() {
                             </div>
                         </div>
                     )}
-
-                    {/* Bottom Navigation */}
-                    <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-[#1e1e2d]/90 backdrop-blur-md rounded-2xl flex justify-around items-center px-4 py-2 border border-white/5 shadow-2xl z-40 h-[70px]">
-                        {user.role === 'Admin' ? (
-                            <button onClick={() => setView('reports')} className={`p-3 rounded-xl transition-colors ${view === 'reports' ? 'text-primary' : 'text-gray-500'}`}>
-                                <Icon name="analytics" filled={view==='reports'} size={28}/>
-                            </button>
-                        ) : <div className="w-10"/>}
-
-                        <div className="relative -top-8">
-                            <button onClick={() => setView('pos')} className="w-16 h-16 rounded-full bg-[#6366f1] flex items-center justify-center shadow-[0_4px_20px_rgba(99,102,241,0.4)] border-4 border-[#0f111a] text-white active:scale-95 transition-transform">
-                                <Icon name="point_of_sale" size={30}/>
-                            </button>
-                        </div>
-
-                        {user.role === 'Admin' ? (
-                            <button onClick={() => setView('inventory')} className={`p-3 rounded-xl transition-colors ${view === 'inventory' ? 'text-primary' : 'text-gray-500'}`}>
-                                <Icon name="inventory_2" filled={view==='inventory'} size={28}/>
-                            </button>
-                        ) : <div className="w-10"/>}
-                    </nav>
                 </div>
 
                 {/* --- DESKTOP SIDEBARS --- */}
@@ -611,15 +587,12 @@ function App() {
                     </div>
                 </div>
                 <nav className="flex-1 px-2 lg:px-4 space-y-2 mt-4">
-                    {['pos', 'inventory', 'reports', 'users', 'settings'].map(id => {
-                        if (user.role !== 'Admin' && id !== 'pos') return null;
-                        return (
-                            <button key={id} onClick={() => setView(id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === id ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                                <Icon name={id === 'pos' ? 'shopping_cart' : id === 'inventory' ? 'inventory_2' : id === 'reports' ? 'analytics' : id === 'users' ? 'group' : 'settings'} size={24}/> 
-                                <span className="hidden lg:inline">{id}</span>
-                            </button>
-                        );
-                    })}
+                    {getNavItems().map(item => (
+                        <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === item.id ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                            <Icon name={item.icon} size={24}/> 
+                            <span className="hidden lg:inline">{item.label}</span>
+                        </button>
+                    ))}
                 </nav>
                 <div className="p-4 mt-auto border-t border-white/5 flex justify-center lg:justify-start">
                     <button onClick={() => setView('login')} className="text-gray-500 hover:text-red-400 transition-colors flex items-center gap-2">
@@ -630,12 +603,30 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                <header className="md:hidden flex justify-between items-center p-4 glass-panel sticky top-0 z-20">
-                    <h1 className="font-bold text-lg capitalize">{view}</h1>
-                    <button onClick={() => setView('login')} className="text-xs text-gray-500">Logout</button>
+                {/* Mobile Top Header (Fixed with Menu Items) */}
+                <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
+                    <div className="flex justify-between items-center p-4 pb-2">
+                         <h1 className="font-bold text-lg flex items-center gap-2">
+                            <span className="bg-primary px-2 py-0.5 rounded text-white text-xs">GL</span> POS
+                         </h1>
+                         <button onClick={() => setView('login')} className="text-xs text-gray-500">Logout</button>
+                    </div>
+                    {/* Navigation Icons Row */}
+                    <div className="flex justify-around items-center px-2">
+                        {getNavItems().map(item => (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setView(item.id)}
+                                className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'bg-white/10 text-white' : 'text-gray-500'}`}
+                            >
+                                <Icon name={item.icon} size={22} filled={view === item.id}/>
+                                <span className="text-[10px] capitalize">{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
                 </header>
 
-                <div className="flex-1 overflow-hidden h-full">
+                <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
                     {view === 'reports' && user.role === 'Admin' && <ReportsView />}

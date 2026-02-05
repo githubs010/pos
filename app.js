@@ -112,7 +112,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v7'); 
+        const saved = localStorage.getItem('pos_data_v8'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -136,7 +136,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v7', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v8', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -145,7 +145,6 @@ function App() {
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
     
-    // Stock Logic
     const adjustStock = (productId, delta, reason) => {
         const product = data.products.find(p => p.id === productId);
         if(!product) return;
@@ -171,7 +170,6 @@ function App() {
         }));
     };
 
-    // Item Management Logic
     const deleteItem = (id) => {
         if(confirm("Are you sure you want to delete this item?")) {
             const newProducts = data.products.filter(p => p.id !== id);
@@ -271,7 +269,48 @@ function App() {
         }
     };
 
-    // --- AUTO SYNC ---
+    // --- CLOUD LOGIC ---
+    
+    // 1. Create New Database (Gist)
+    const createCloudDatabase = async () => {
+        if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
+        
+        setIsSyncing(true);
+        try {
+            const res = await fetch("https://api.github.com/gists", {
+                method: "POST",
+                headers: { 
+                    "Authorization": `token ${ghConfig.token}`, 
+                    "Accept": "application/vnd.github.v3+json",
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    description: "GL POS Database",
+                    public: false,
+                    files: {
+                        "pos_data.json": {
+                            content: JSON.stringify(data)
+                        }
+                    }
+                })
+            });
+            
+            const json = await res.json();
+            if(json.id) {
+                setGhConfig(prev => ({ ...prev, gistId: json.id }));
+                alert("Database Created Successfully! Auto-sync is now active.");
+                setIsOnline(true);
+            } else {
+                throw new Error("No ID returned");
+            }
+        } catch(e) {
+            alert("Failed to create database. Check your token permissions (need 'gist' scope).");
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    // 2. Sync to existing Gist
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         setIsSyncing(true);
@@ -291,6 +330,7 @@ function App() {
         }
     };
 
+    // 3. Auto-Sync Effect
     useEffect(() => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         const timer = setTimeout(() => { syncCloud(true); }, 5000);
@@ -585,11 +625,23 @@ function App() {
             </div>
             <div className="ref-card p-6 rounded-2xl">
                 <h3 className="font-bold mb-4">Cloud Backup</h3>
+                <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
                 <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
-                <Input label="Gist ID" value={ghConfig.gistId} onChange={e=>setGhConfig({...ghConfig, gistId: e.target.value})} />
-                <div className="flex gap-4 mt-4">
-                    <Button onClick={() => syncCloud(false)} variant="secondary">Sync Now</Button>
-                </div>
+                
+                {ghConfig.gistId ? (
+                     <Input label="Gist ID" value={ghConfig.gistId} onChange={e=>setGhConfig({...ghConfig, gistId: e.target.value})} />
+                ) : (
+                    <div className="bg-white/5 p-3 rounded-xl mb-4 text-center">
+                        <p className="text-sm mb-3">No Database Connected</p>
+                        <Button onClick={createCloudDatabase} className="w-full bg-emerald-600 hover:bg-emerald-500">Create New Database</Button>
+                    </div>
+                )}
+                
+                {ghConfig.gistId && (
+                    <div className="flex gap-4 mt-4">
+                        <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync Now</Button>
+                    </div>
+                )}
             </div>
         </div>
     );

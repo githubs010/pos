@@ -18,7 +18,7 @@ const Button = ({ children, onClick, variant = "primary", className = "", ...pro
         white: "bg-white text-slate-900 hover:bg-gray-100 border-transparent"
     };
     return (
-        <button onClick={onClick} className={`px-6 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
+        <button onClick={onClick} className={`px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
             {children}
         </button>
     );
@@ -92,7 +92,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v25'); 
+        const saved = localStorage.getItem('pos_data_v26'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v25', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v26', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -202,6 +202,7 @@ function App() {
     };
 
     // --- CLOUD LOGIC ---
+    // 1. Create Cloud Database
     const createCloudDatabase = async () => {
         if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
         setIsSyncing(true);
@@ -221,6 +222,7 @@ function App() {
         } catch(e) { alert("Error: " + e.message); } finally { setIsSyncing(false); }
     };
 
+    // 2. Sync (PUSH) Local -> Cloud
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         setIsSyncing(true);
@@ -235,6 +237,30 @@ function App() {
         } catch(e) { setIsOnline(false); if(!silent) alert("Sync Failed"); } finally { setIsSyncing(false); }
     };
 
+    // 3. Load (PULL) Cloud -> Local
+    const loadFromCloud = async () => {
+        if(!ghConfig.token || !ghConfig.gistId) { alert("Please enter GitHub Token and Gist ID."); return; }
+        setIsSyncing(true);
+        try {
+            const res = await fetch(`https://api.github.com/gists/${ghConfig.gistId}`, {
+                headers: { "Authorization": `token ${ghConfig.token}` }
+            });
+            const json = await res.json();
+            if(json.files && json.files["pos_data.json"]) {
+                const cloudData = JSON.parse(json.files["pos_data.json"].content);
+                setData(cloudData);
+                alert("Data Successfully Loaded from Cloud!");
+            } else {
+                alert("No valid POS data found in this Gist ID.");
+            }
+        } catch(e) { 
+            alert("Load Failed: " + e.message); 
+        } finally { 
+            setIsSyncing(false); 
+        }
+    };
+
+    // Auto-sync effect
     useEffect(() => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         const timer = setTimeout(() => { syncCloud(true); }, 5000);
@@ -568,7 +594,8 @@ function App() {
                 
                 {ghConfig.gistId && (
                     <div className="flex gap-4 mt-4">
-                        <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync Now</Button>
+                        <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync (Push)</Button>
+                        <Button onClick={loadFromCloud} variant="primary" className="flex-1">Load (Pull)</Button>
                     </div>
                 )}
             </div>
@@ -625,7 +652,9 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                {/* MOBILE TOP NAV (FIXED) */}
+                
+                {/* --- MOBILE TOP NAVIGATION (FIXED & SINGLE) --- */}
+                {/* Only visible on mobile, z-index 50 to stay on top */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -708,6 +737,7 @@ function App() {
                                             <div className="font-bold text-white">{item.name}</div>
                                             <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                         </div>
+                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>

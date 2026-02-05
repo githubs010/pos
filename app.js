@@ -112,7 +112,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v8'); 
+        const saved = localStorage.getItem('pos_data_v11'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -136,7 +136,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v8', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v11', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -270,11 +270,8 @@ function App() {
     };
 
     // --- CLOUD LOGIC ---
-    
-    // 1. Create New Database (Gist)
     const createCloudDatabase = async () => {
         if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
-        
         setIsSyncing(true);
         try {
             const res = await fetch("https://api.github.com/gists", {
@@ -284,33 +281,22 @@ function App() {
                     "Accept": "application/vnd.github.v3+json",
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    description: "GL POS Database",
-                    public: false,
-                    files: {
-                        "pos_data.json": {
-                            content: JSON.stringify(data)
-                        }
-                    }
-                })
+                body: JSON.stringify({ description: "GL POS Database", public: false, files: { "pos_data.json": { content: JSON.stringify(data) } } })
             });
-            
             const json = await res.json();
+            if(!res.ok) throw new Error(json.message || "GitHub refused the connection.");
             if(json.id) {
                 setGhConfig(prev => ({ ...prev, gistId: json.id }));
                 alert("Database Created Successfully! Auto-sync is now active.");
                 setIsOnline(true);
-            } else {
-                throw new Error("No ID returned");
             }
         } catch(e) {
-            alert("Failed to create database. Check your token permissions (need 'gist' scope).");
+            alert("Error: " + e.message + "\n\nMake sure your Token has 'gist' permission checked!");
         } finally {
             setIsSyncing(false);
         }
     };
 
-    // 2. Sync to existing Gist
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         setIsSyncing(true);
@@ -330,7 +316,6 @@ function App() {
         }
     };
 
-    // 3. Auto-Sync Effect
     useEffect(() => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         const timer = setTimeout(() => { syncCloud(true); }, 5000);
@@ -380,12 +365,15 @@ function App() {
         return (
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
-                    <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10">
+                    {/* Header */}
+                    <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
                         <div className="relative flex-1">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
                             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-surface-dark border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-colors text-sm text-white"/>
                         </div>
                     </div>
+
+                    {/* Product Grid */}
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 md:pb-4 no-scrollbar">
                         {filtered.map(p => (
                             <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
@@ -402,24 +390,28 @@ function App() {
                             </button>
                         ))}
                     </div>
+                    
+                    {/* --- MOBILE CHECKOUT & NAVIGATION --- */}
                     {cart.length > 0 && (
-                        <div className="md:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
-                            <div className="glass-panel-heavy p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
+                        <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 animate-in">
+                            <div className="glass-panel-heavy p-3 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary relative">
                                         <Icon name="shopping_bag" size={20}/>
                                         <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.reduce((a,b)=>a+b.quantity,0)}</span>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-400 font-medium">Total</div>
-                                        <div className="font-bold text-white">₹{currentTotal.toFixed(2)}</div>
+                                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold">Total</div>
+                                        <div className="font-bold text-white text-lg">₹{currentTotal.toFixed(2)}</div>
                                     </div>
                                 </div>
-                                <Button onClick={checkout} size="sm">Gen Bill</Button>
+                                <Button onClick={checkout} size="sm" className="px-6">Gen Bill</Button>
                             </div>
                         </div>
                     )}
                 </div>
+
+                {/* --- DESKTOP SIDEBARS (unchanged) --- */}
                 <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
@@ -484,11 +476,8 @@ function App() {
                             <div className="text-xs text-gray-400">₹{p.price}</div>
                         </div>
                         <div className="flex items-center gap-4">
-                             {/* Actions */}
                             <button onClick={() => setEditingItem(p)} className="text-blue-400 hover:text-white"><Icon name="edit" size={20}/></button>
                             <button onClick={() => deleteItem(p.id)} className="text-red-400 hover:text-red-200"><Icon name="delete" size={20}/></button>
-                            
-                            {/* Quick Stock */}
                             <div className="flex items-center gap-3 bg-surface-dark px-2 py-1 rounded-lg border border-white/5">
                                 <button onClick={() => adjustStock(p.id, -1, 'Manual Correction')} className="text-gray-400 hover:text-white"><Icon name="remove" size={18}/></button>
                                 <span className="w-6 text-center font-mono text-sm">{p.stock}</span>
@@ -695,24 +684,36 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                <header className="md:hidden flex justify-between items-center p-4 glass-panel sticky top-0 z-20">
-                    <h1 className="font-bold text-lg capitalize">{view}</h1>
-                    {user?.role === 'Admin' && <button onClick={() => setView('settings')}><Icon name="settings"/></button>}
+                {/* Mobile Top Header (Fixed with Menu Items) */}
+                <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5">
+                    <div className="flex justify-between items-center p-4">
+                         <h1 className="font-bold text-lg flex items-center gap-2">
+                            <span className="bg-primary px-2 py-0.5 rounded text-white text-xs">GL</span> POS
+                         </h1>
+                         <button onClick={() => setView('login')} className="text-xs text-gray-500">Logout</button>
+                    </div>
+                    {/* Navigation Items in Header */}
+                    <div className="flex gap-2 overflow-x-auto px-4 pb-3 no-scrollbar">
+                        {getNavItems().map(item => (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setView(item.id)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg whitespace-nowrap transition-all border border-transparent ${view === item.id ? 'bg-white/10 text-white border-white/10' : 'text-gray-500'}`}
+                            >
+                                <Icon name={item.icon} size={18} filled={view === item.id}/>
+                                <span className="text-xs font-medium">{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
                 </header>
 
-                <div className="flex-1 overflow-hidden h-full">
+                <div className="flex-1 overflow-hidden h-full pt-[105px] md:pt-0">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
                     {view === 'reports' && user.role === 'Admin' && <ReportsView />}
                     {view === 'users' && user.role === 'Admin' && <UsersView />}
                     {view === 'settings' && user.role === 'Admin' && <SettingsView />}
                 </div>
-
-                <nav className="md:hidden fixed bottom-6 left-6 right-6 glass-panel-heavy rounded-2xl flex justify-around items-center p-2 border border-white/10 shadow-2xl z-40">
-                    <button onClick={() => user.role === 'Admin' && setView('reports')} className={`p-3 ${view === 'reports' ? 'text-primary' : 'text-gray-500'}`} disabled={user.role !== 'Admin'}><Icon name="analytics"/></button>
-                    <button onClick={() => setView('pos')} className="w-16 h-16 rounded-full bg-primary flex items-center justify-center -mt-8 border-4 border-background-dark text-white"><Icon name="point_of_sale"/></button>
-                    <button onClick={() => user.role === 'Admin' && setView('inventory')} className={`p-3 ${view === 'inventory' ? 'text-primary' : 'text-gray-500'}`} disabled={user.role !== 'Admin'}><Icon name="inventory_2"/></button>
-                </nav>
             </main>
 
             {/* Receipt Modal */}

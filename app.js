@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useRef } = React;
 
 // --- ICONS ---
 const Icon = ({ name, size = 24, filled = false, className = "" }) => (
@@ -105,10 +105,11 @@ function App() {
     // STATE
     const [view, setView] = useState('login'); 
     const [user, setUser] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v5'); 
+        const saved = localStorage.getItem('pos_data_v6'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -132,7 +133,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v5', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v6', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -251,17 +252,40 @@ function App() {
         }
     };
 
-    const syncCloud = async () => {
-        if(!ghConfig.token) return;
+    // --- CLOUD SYNC LOGIC ---
+    
+    // Manual Sync (with alerts)
+    const syncCloud = async (silent = false) => {
+        if(!ghConfig.token || !ghConfig.gistId) return;
+        
+        setIsSyncing(true);
         try {
             await fetch(`https://api.github.com/gists/${ghConfig.gistId}`, {
                 method: "PATCH",
                 headers: { "Authorization": `token ${ghConfig.token}`, "Accept": "application/vnd.github.v3+json" },
                 body: JSON.stringify({ files: { "pos_data.json": { content: JSON.stringify(data) } } })
             });
-            alert("Synced to Cloud!");
-        } catch(e) { alert("Sync Failed"); }
+            setIsOnline(true);
+            if(!silent) alert("Synced to Cloud!");
+        } catch(e) { 
+            setIsOnline(false);
+            if(!silent) alert("Sync Failed"); 
+        } finally {
+            setIsSyncing(false);
+        }
     };
+
+    // Auto-Sync Effect (Debounced)
+    useEffect(() => {
+        if(!ghConfig.token || !ghConfig.gistId) return;
+
+        // Debounce timer: Wait 5 seconds after last change before syncing
+        const timer = setTimeout(() => {
+            syncCloud(true); // Silent sync
+        }, 5000);
+
+        return () => clearTimeout(timer);
+    }, [data, ghConfig]);
 
     // --- VIEWS ---
     const LoginView = () => (
@@ -286,7 +310,7 @@ function App() {
         </div>
     );
 
-    // --- POS VIEW (RESPONSIVE SPLIT SCREEN) ---
+    // --- POS VIEW ---
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -295,7 +319,7 @@ function App() {
 
         return (
             <div className="flex h-full animate-in overflow-hidden">
-                {/* Left Side: Products (Full width on Mobile, Flexible on Tablet/Desktop) */}
+                {/* Left Side: Products */}
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
                     <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10">
                         <div className="relative flex-1">
@@ -321,7 +345,7 @@ function App() {
                         ))}
                     </div>
 
-                    {/* Mobile Only Floating Cart (Hidden on md/tablet and up) */}
+                    {/* Mobile Only Floating Cart */}
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
                             <div className="glass-panel-heavy p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
@@ -341,7 +365,7 @@ function App() {
                     )}
                 </div>
 
-                {/* Right Side: Billing Sidebar (Visible on Tablet 'md' and up) */}
+                {/* Right Side: Billing Sidebar */}
                 <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
@@ -544,7 +568,7 @@ function App() {
                 <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
                 <Input label="Gist ID" value={ghConfig.gistId} onChange={e=>setGhConfig({...ghConfig, gistId: e.target.value})} />
                 <div className="flex gap-4 mt-4">
-                    <Button onClick={syncCloud} variant="secondary">Sync Now</Button>
+                    <Button onClick={() => syncCloud(false)} variant="secondary">Sync Now</Button>
                 </div>
             </div>
         </div>
@@ -560,12 +584,28 @@ function App() {
             </div>
 
             <aside className="hidden md:flex w-20 lg:w-64 surface-dark flex-col z-50 h-full border-r border-white/5 transition-all">
-                <div className="p-4 lg:p-6 flex items-center justify-center lg:justify-start">
-                    <h1 className="text-xl lg:text-2xl font-bold lg:flex items-center gap-2">
+                <div className="p-4 lg:p-6">
+                    <h1 className="text-xl lg:text-2xl font-bold lg:flex items-center gap-2 justify-center lg:justify-start">
                         <span className="bg-primary px-2 py-0.5 rounded text-white hidden lg:block">GL</span>
                         <span className="hidden lg:block">POS</span>
                         <Icon name="point_of_sale" className="lg:hidden text-primary" size={32}/>
                     </h1>
+                    {/* Sync Status */}
+                    <div className="mt-4 flex justify-center lg:justify-start">
+                        {isSyncing ? (
+                            <div className="flex items-center gap-2 text-[10px] text-yellow-400 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-500/20">
+                                <Icon name="sync" size={14} className="animate-spin"/> <span className="hidden lg:inline">Saving...</span>
+                            </div>
+                        ) : isOnline ? (
+                            <div className="flex items-center gap-2 text-[10px] text-emerald-400 bg-emerald-900/20 px-2 py-1 rounded border border-emerald-500/20">
+                                <Icon name="cloud_done" size={14}/> <span className="hidden lg:inline">Cloud Synced</span>
+                            </div>
+                        ) : (
+                             <div className="flex items-center gap-2 text-[10px] text-gray-400 bg-gray-800 px-2 py-1 rounded border border-gray-700">
+                                <Icon name="cloud_off" size={14}/> <span className="hidden lg:inline">Local Only</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
                 <nav className="flex-1 px-2 lg:px-4 space-y-2 mt-4">
                     {['pos', 'inventory', 'reports', 'users', 'settings'].map(id => (

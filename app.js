@@ -92,13 +92,13 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v24'); 
+        const saved = localStorage.getItem('pos_data_v25'); 
         return saved ? JSON.parse(saved) : {
             products: [
-                { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
-                { id: 2, name: "Filter Coffee", price: 25.00, category: "Coffee", stock: 80 },
-                { id: 3, name: "Samosa", price: 20.00, category: "Snacks", stock: 24 },
-                { id: 4, name: "Vada Pav", price: 30.00, category: "Snacks", stock: 50 },
+                { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
+                { id: 2, name: "Filter Coffee", price: 25.00, category: "Coffee", stock: 80, image: "" },
+                { id: 3, name: "Samosa", price: 20.00, category: "Snacks", stock: 24, image: "" },
+                { id: 4, name: "Vada Pav", price: 30.00, category: "Snacks", stock: 50, image: "" },
             ],
             users: [
                 { id: 1, username: "admin", password: "123", role: "Admin", name: "Super Admin" },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v24', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v25', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -276,7 +276,6 @@ function App() {
         </div>
     );
 
-    // --- CLEAN POS VIEW (NO HEADER) ---
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -285,9 +284,17 @@ function App() {
         return (
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
-                    {/* SEARCH BAR ONLY - NO HEADER ICONS */}
-                    <div className="p-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
+                    {/* MOBILE SEARCH */}
+                    <div className="md:hidden mt-[110px] p-4 pb-0">
                         <div className="relative">
+                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
+                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
+                        </div>
+                    </div>
+
+                    {/* DESKTOP HEADER */}
+                    <div className="hidden md:flex p-4 gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
+                        <div className="relative flex-1">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
                             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
                         </div>
@@ -300,9 +307,13 @@ function App() {
                                 const ex = prev.find(i => i.id === p.id);
                                 return ex ? prev.map(i => i.id === p.id ? {...i, quantity: i.quantity+1}:i) : [...prev, {...p, quantity:1}];
                             })} disabled={p.stock <= 0} className="bg-[#181b29]/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex flex-col items-start text-left hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all relative overflow-hidden group">
-                                <div className="w-10 h-10 rounded-lg bg-[#6366f1]/20 flex items-center justify-center mb-3 text-[#818cf8] group-hover:text-white transition-colors">
-                                    <span className="font-bold text-lg">{p.name[0]}</span>
-                                </div>
+                                {p.image ? (
+                                    <img src={p.image} className="w-12 h-12 rounded-lg object-cover mb-3 bg-[#2b2b40]" alt={p.name} />
+                                ) : (
+                                    <div className="w-12 h-12 rounded-lg bg-[#6366f1]/20 flex items-center justify-center mb-3 text-[#818cf8] group-hover:text-white transition-colors">
+                                        <span className="font-bold text-lg">{p.name[0]}</span>
+                                    </div>
+                                )}
                                 <div className="font-bold text-white leading-tight mb-1">{p.name}</div>
                                 <div className="text-xs text-gray-400 mb-2">{p.stock} in stock</div>
                                 <div className="font-mono text-[#6366f1] font-bold">₹{p.price.toFixed(2)}</div>
@@ -379,16 +390,17 @@ function App() {
     };
 
     const InventoryView = () => (
-        <div className="animate-in p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <Button onClick={() => {
                     const n = prompt("Item Name");
                     const p = Number(prompt("Price (₹)"));
                     const s = Number(prompt("Initial Stock"));
+                    const img = prompt("Image URL (Optional)");
                     if(n && p && s) {
                         const newId = Date.now();
-                        updateData('products', [...data.products, { id: newId, name: n, price: p, category: 'General', stock: s }]);
+                        updateData('products', [...data.products, { id: newId, name: n, price: p, category: 'General', stock: s, image: img || "" }]);
                         setData(prev => ({ ...prev, stockLog: [{ id: Date.now(), date: new Date().toISOString(), type: 'IN', prodName: n, qty: s, reason: 'New Item' }, ...prev.stockLog] }));
                     }
                 }} size="sm"><Icon name="add"/> Add Item</Button>
@@ -396,9 +408,12 @@ function App() {
             <div className="grid gap-3">
                 {data.products.map(p => (
                     <div key={p.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between border border-white/5">
-                        <div className="flex-1">
-                            <div className="font-bold text-white">{p.name}</div>
-                            <div className="text-xs text-gray-400">₹{p.price}</div>
+                        <div className="flex-1 flex items-center gap-3">
+                            {p.image ? <img src={p.image} className="w-10 h-10 rounded-lg object-cover bg-[#2b2b40]"/> : <div className="w-10 h-10 rounded-lg bg-[#2b2b40] flex items-center justify-center text-xs text-gray-500"><Icon name="image_not_supported" size={18}/></div>}
+                            <div>
+                                <div className="font-bold text-white">{p.name}</div>
+                                <div className="text-xs text-gray-400">₹{p.price}</div>
+                            </div>
                         </div>
                         <div className="flex items-center gap-4">
                             <button onClick={() => setEditingItem(p)} className="text-blue-400 hover:text-white"><Icon name="edit" size={20}/></button>
@@ -418,7 +433,7 @@ function App() {
     const ReportsView = () => {
         const [reportType, setReportType] = useState('sales'); 
         return (
-            <div className="animate-in flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
+            <div className="animate-in pt-[130px] md:pt-0 flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Analytics</h2>
                     <div className="flex gap-2 bg-[#181b29] p-1 rounded-lg">
@@ -486,7 +501,7 @@ function App() {
     const UsersView = () => {
          const [newUser, setNewUser] = useState({ name: '', username: '', password: '', role: 'Staff' });
          return (
-             <div className="animate-in p-4 lg:p-8 overflow-y-auto h-full">
+             <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
                  <h2 className="text-2xl font-bold mb-6">User Management</h2>
                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                      <div className="lg:col-span-3 space-y-3">
@@ -527,7 +542,7 @@ function App() {
     };
 
     const SettingsView = () => (
-        <div className="animate-in p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
              <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
                 <h3 className="font-bold mb-4">Business Profile</h3>
@@ -610,9 +625,7 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                
-                {/* --- MOBILE TOP NAVIGATION (MAIN MENU ICONS) --- */}
-                {/* Fixed at top, z-50 to stay above content */}
+                {/* MOBILE TOP NAV (FIXED) */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -719,6 +732,7 @@ function App() {
                         <div className="space-y-4">
                             <Input label="Name" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} />
                             <Input label="Price (₹)" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} />
+                            <Input label="Image URL" value={editingItem.image || ''} onChange={e => setEditingItem({...editingItem, image: e.target.value})} />
                             <div className="flex gap-4 pt-2">
                                 <Button onClick={() => setEditingItem(null)} variant="secondary" className="flex-1">Cancel</Button>
                                 <Button onClick={saveEditedItem} className="flex-1">Save</Button>

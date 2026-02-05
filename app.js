@@ -86,12 +86,13 @@ function App() {
     const [user, setUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
     
-    // Editor State
+    // UI State
+    const [showMobileCart, setShowMobileCart] = useState(false); // Mobile Cart Modal
     const [editingItem, setEditingItem] = useState(null);
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v12'); 
+        const saved = localStorage.getItem('pos_data_v13'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -115,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v12', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v13', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -124,6 +125,18 @@ function App() {
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
     
+    // --- CART ACTIONS ---
+    const updateCartQty = (itemId, delta) => {
+        setCart(prev => {
+            return prev.map(item => {
+                if (item.id === itemId) {
+                    return { ...item, quantity: Math.max(0, item.quantity + delta) };
+                }
+                return item;
+            }).filter(item => item.quantity > 0);
+        });
+    };
+
     const adjustStock = (productId, delta, reason) => {
         const product = data.products.find(p => p.id === productId);
         if(!product) return;
@@ -159,6 +172,7 @@ function App() {
         setData(prev => ({ ...prev, products: newProducts, sales: [tx, ...prev.sales], stockLog: [...newLogs, ...prev.stockLog] }));
         setReceiptTx(tx);
         setCart([]);
+        setShowMobileCart(false); // Close mobile cart if open
     };
 
     const handlePrint = (tx) => {
@@ -228,6 +242,18 @@ function App() {
         return () => clearTimeout(timer);
     }, [data, ghConfig]);
 
+    // --- NAVIGATION FILTER ---
+    const getNavItems = () => {
+        const allNav = [
+            { id: 'pos', icon: 'shopping_cart', label: 'POS', roles: ['Admin', 'Staff'] },
+            { id: 'inventory', icon: 'inventory_2', label: 'Inventory', roles: ['Admin'] },
+            { id: 'reports', icon: 'analytics', label: 'Reports', roles: ['Admin'] },
+            { id: 'users', icon: 'group', label: 'Users', roles: ['Admin'] },
+            { id: 'settings', icon: 'settings', label: 'Settings', roles: ['Admin'] }
+        ];
+        return allNav.filter(item => item.roles.includes(user?.role || 'Staff'));
+    };
+
     // --- VIEWS ---
     const LoginView = () => (
         <div className="min-h-screen flex items-center justify-center p-6 bg-background-dark">
@@ -287,18 +313,17 @@ function App() {
                     </div>
                     
                     {/* --- MOBILE FLOATING UI --- */}
-                    
-                    {/* 1. Gen Bill Bar (Matching image_cccaac.png) */}
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-28 left-4 right-4 z-50 animate-in">
                             <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/5">
-                                <div className="flex items-center gap-3">
+                                {/* Click Area to Open Cart Modal */}
+                                <div className="flex items-center gap-3 active:scale-95 transition-transform" onClick={() => setShowMobileCart(true)}>
                                     <div className="w-12 h-12 bg-[#2b2b40] rounded-full flex items-center justify-center text-[#6366f1] relative">
                                         <Icon name="shopping_bag" size={24}/>
                                         <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-bold border-2 border-[#1e1e2d]">{cart.reduce((a,b)=>a+b.quantity,0)}</span>
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5">Total</div>
+                                        <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5 flex items-center gap-1">Total <Icon name="expand_less" size={14}/></div>
                                         <div className="font-bold text-white text-xl">₹{currentTotal.toFixed(2)}</div>
                                     </div>
                                 </div>
@@ -307,23 +332,20 @@ function App() {
                         </div>
                     )}
 
-                    {/* 2. Bottom Navigation (Matching image_ccceec.png) */}
+                    {/* Bottom Navigation */}
                     <nav className="md:hidden fixed bottom-6 left-6 right-6 bg-[#1e1e2d]/90 backdrop-blur-md rounded-2xl flex justify-around items-center px-4 py-2 border border-white/5 shadow-2xl z-40 h-[70px]">
-                        {/* Reports (Left) */}
                         {user.role === 'Admin' ? (
                             <button onClick={() => setView('reports')} className={`p-3 rounded-xl transition-colors ${view === 'reports' ? 'text-primary' : 'text-gray-500'}`}>
                                 <Icon name="analytics" filled={view==='reports'} size={28}/>
                             </button>
                         ) : <div className="w-10"/>}
 
-                        {/* Center POS Button */}
                         <div className="relative -top-8">
                             <button onClick={() => setView('pos')} className="w-16 h-16 rounded-full bg-[#6366f1] flex items-center justify-center shadow-[0_4px_20px_rgba(99,102,241,0.4)] border-4 border-[#0f111a] text-white active:scale-95 transition-transform">
                                 <Icon name="point_of_sale" size={30}/>
                             </button>
                         </div>
 
-                        {/* Inventory (Right) */}
                         {user.role === 'Admin' ? (
                             <button onClick={() => setView('inventory')} className={`p-3 rounded-xl transition-colors ${view === 'inventory' ? 'text-primary' : 'text-gray-500'}`}>
                                 <Icon name="inventory_2" filled={view==='inventory'} size={28}/>
@@ -650,6 +672,40 @@ function App() {
                         <div className="p-4 grid grid-cols-2 gap-3">
                             <Button onClick={() => handlePrint(receiptTx)} variant="secondary"><Icon name="print"/> Print</Button>
                             <Button onClick={() => generateReceiptPDF(receiptTx, data.profile)}><Icon name="download"/> PDF</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MOBILE CART MODAL */}
+            {showMobileCart && (
+                <div className="md:hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-in">
+                    <div className="bg-[#1e1e2d] rounded-t-3xl w-full max-h-[80vh] flex flex-col border-t border-white/10 shadow-2xl">
+                        <div className="p-4 border-b border-white/5 flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="shopping_cart"/> Current Cart</h2>
+                            <button onClick={() => setShowMobileCart(false)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white"><Icon name="close"/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {cart.map(item => (
+                                <div key={item.id} className="glass-card p-3 rounded-xl flex items-center justify-between">
+                                    <div className="flex-1">
+                                        <div className="font-bold text-white">{item.name}</div>
+                                        <div className="text-sm text-primary font-bold">₹{item.price}</div>
+                                    </div>
+                                    <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
+                                        <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
+                                        <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>
+                                        <button onClick={() => updateCartQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white bg-primary rounded-md active:scale-95"><Icon name="add" size={16}/></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-4 bg-black/20 border-t border-white/5">
+                            <div className="flex justify-between items-center mb-4 text-lg font-bold">
+                                <span className="text-gray-400">Total Amount</span>
+                                <span className="text-white text-xl">₹{cart.reduce((a,b)=>a+(b.price*b.quantity),0).toFixed(2)}</span>
+                            </div>
+                            <Button onClick={checkout} className="w-full py-4 text-lg bg-[#6366f1] hover:bg-[#4f46e5]">Checkout & Print</Button>
                         </div>
                     </div>
                 </div>

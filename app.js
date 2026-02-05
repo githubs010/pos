@@ -92,7 +92,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v23'); 
+        const saved = localStorage.getItem('pos_data_v24'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v23', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v24', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -125,7 +125,6 @@ function App() {
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
     
-    // --- CART LOGIC ---
     const updateCartQty = (itemId, delta) => {
         setCart(prev => {
             return prev.map(item => {
@@ -277,6 +276,7 @@ function App() {
         </div>
     );
 
+    // --- CLEAN POS VIEW (NO HEADER) ---
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -285,18 +285,9 @@ function App() {
         return (
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
-                    
-                    {/* MOBILE SEARCH (Visible only on Mobile) */}
-                    <div className="md:hidden mt-[110px] p-4 pb-0">
+                    {/* SEARCH BAR ONLY - NO HEADER ICONS */}
+                    <div className="p-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
                         <div className="relative">
-                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
-                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
-                        </div>
-                    </div>
-
-                    {/* DESKTOP HEADER */}
-                    <div className="hidden md:flex p-4 gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
-                        <div className="relative flex-1">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
                             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
                         </div>
@@ -324,7 +315,6 @@ function App() {
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 animate-in">
                             <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10 ring-1 ring-white/5">
-                                {/* Click Area to Open Cart Modal */}
                                 <div className="flex items-center gap-3 active:scale-95 transition-transform" onClick={() => setShowMobileCart(true)}>
                                     <div className="w-12 h-12 bg-[#2b2b40] rounded-full flex items-center justify-center text-[#6366f1] relative">
                                         <Icon name="shopping_bag" size={24}/>
@@ -360,7 +350,6 @@ function App() {
                                         <div className="font-bold text-white text-sm truncate">{item.name}</div>
                                         <div className="text-xs text-gray-400">₹{item.price}</div>
                                     </div>
-                                    {/* Desktop Quantity Controls */}
                                     <div className="flex items-center gap-2 bg-[#0f111a] rounded-lg p-1 mx-2">
                                         <button onClick={() => updateCartQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"><Icon name="remove" size={14}/></button>
                                         <span className="font-mono font-bold w-4 text-center text-white text-xs">{item.quantity}</span>
@@ -390,7 +379,7 @@ function App() {
     };
 
     const InventoryView = () => (
-        <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in p-4 lg:p-8 overflow-y-auto h-full">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <Button onClick={() => {
@@ -429,7 +418,7 @@ function App() {
     const ReportsView = () => {
         const [reportType, setReportType] = useState('sales'); 
         return (
-            <div className="animate-in pt-[130px] md:pt-0 flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
+            <div className="animate-in flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Analytics</h2>
                     <div className="flex gap-2 bg-[#181b29] p-1 rounded-lg">
@@ -497,7 +486,7 @@ function App() {
     const UsersView = () => {
          const [newUser, setNewUser] = useState({ name: '', username: '', password: '', role: 'Staff' });
          return (
-             <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+             <div className="animate-in p-4 lg:p-8 overflow-y-auto h-full">
                  <h2 className="text-2xl font-bold mb-6">User Management</h2>
                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                      <div className="lg:col-span-3 space-y-3">
@@ -538,7 +527,7 @@ function App() {
     };
 
     const SettingsView = () => (
-        <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in p-4 lg:p-8 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
              <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
                 <h3 className="font-bold mb-4">Business Profile</h3>
@@ -621,7 +610,9 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                {/* MOBILE TOP NAV (FIXED) */}
+                
+                {/* --- MOBILE TOP NAVIGATION (MAIN MENU ICONS) --- */}
+                {/* Fixed at top, z-50 to stay above content */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">

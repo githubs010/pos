@@ -92,7 +92,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v17'); 
+        const saved = localStorage.getItem('pos_data_v20'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v17', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v20', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -285,30 +285,7 @@ function App() {
         return (
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
-                    
-                    {/* MOBILE TOP NAV + HEADER */}
-                    <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
-                        <div className="flex justify-between items-center p-4 pb-2">
-                             <h1 className="font-bold text-lg flex items-center gap-2">
-                                <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white text-xs">GL</span> POS
-                             </h1>
-                             <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
-                        </div>
-                        {/* MAIN MENU ICONS ON TOP */}
-                        <div className="flex justify-around items-center px-2">
-                            {getNavItems().map(item => (
-                                <button 
-                                    key={item.id} 
-                                    onClick={() => setView(item.id)}
-                                    className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'text-[#6366f1]' : 'text-gray-500'}`}
-                                >
-                                    <Icon name={item.icon} size={24} filled={view === item.id}/>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* MOBILE SEARCH (Below Header) */}
+                    {/* MOBILE SEARCH (Below Top Menu) */}
                     <div className="md:hidden mt-[110px] p-4 pb-0">
                         <div className="relative">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
@@ -363,7 +340,7 @@ function App() {
                     )}
                 </div>
 
-                {/* --- DESKTOP SIDEBARS (unchanged) --- */}
+                {/* --- DESKTOP SIDEBARS --- */}
                 <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-[#181b29] h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
@@ -378,11 +355,17 @@ function App() {
                         ) : (
                              cart.map(item => (
                                 <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between group">
-                                    <div>
-                                        <div className="font-bold text-white text-sm">{item.name}</div>
-                                        <div className="text-xs text-gray-400">₹{item.price} x {item.quantity}</div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-bold text-white text-sm truncate">{item.name}</div>
+                                        <div className="text-xs text-gray-400">₹{item.price}</div>
                                     </div>
-                                    <div className="font-bold text-[#6366f1]">₹{(item.price * item.quantity).toFixed(2)}</div>
+                                    {/* Desktop Quantity Controls */}
+                                    <div className="flex items-center gap-2 bg-[#0f111a] rounded-lg p-1 mx-2">
+                                        <button onClick={() => updateCartQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"><Icon name="remove" size={14}/></button>
+                                        <span className="font-mono font-bold w-4 text-center text-white text-xs">{item.quantity}</span>
+                                        <button onClick={() => updateCartQty(item.id, 1)} className="w-6 h-6 flex items-center justify-center text-white bg-[#6366f1] hover:bg-[#4f46e5] rounded transition-colors"><Icon name="add" size={14}/></button>
+                                    </div>
+                                    <div className="font-bold text-white text-sm w-16 text-right">₹{(item.price * item.quantity).toFixed(2)}</div>
                                 </div>
                              ))
                         )}
@@ -637,8 +620,7 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                
-                {/* --- MOBILE TOP NAVIGATION (MAIN MENU ICONS) --- */}
+                {/* MOBILE TOP NAV (FIXED) */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -660,7 +642,7 @@ function App() {
                     </div>
                 </div>
 
-                {/* Content Area with Top Padding */}
+                {/* Content Area with Top Padding for Mobile Nav */}
                 <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}

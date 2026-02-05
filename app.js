@@ -18,7 +18,7 @@ const Button = ({ children, onClick, variant = "primary", className = "", ...pro
         white: "bg-white text-slate-900 hover:bg-gray-100 border-transparent"
     };
     return (
-        <button onClick={onClick} className={`px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
+        <button onClick={onClick} className={`px-6 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
             {children}
         </button>
     );
@@ -92,7 +92,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v16'); 
+        const saved = localStorage.getItem('pos_data_v17'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v16', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v17', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -125,6 +125,7 @@ function App() {
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
     
+    // --- CART LOGIC (ADD/REMOVE) ---
     const updateCartQty = (itemId, delta) => {
         setCart(prev => {
             return prev.map(item => {
@@ -258,7 +259,7 @@ function App() {
         <div className="min-h-screen flex items-center justify-center p-6 bg-background-dark">
             <div className="glass-panel w-full max-w-sm p-8 rounded-3xl relative z-10 animate-in">
                 <div className="flex justify-center mb-6">
-                    <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
+                    <div className="w-16 h-16 rounded-2xl bg-[#6366f1] flex items-center justify-center shadow-lg">
                         <Icon name="point_of_sale" size={32} className="text-white"/>
                     </div>
                 </div>
@@ -285,7 +286,7 @@ function App() {
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
                     
-                    {/* MOBILE SEARCH (Visible only on Mobile) */}
+                    {/* MOBILE SEARCH */}
                     <div className="md:hidden p-4 pb-0">
                         <div className="relative">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
@@ -293,7 +294,7 @@ function App() {
                         </div>
                     </div>
 
-                    {/* DESKTOP HEADER (Search) */}
+                    {/* DESKTOP HEADER */}
                     <div className="hidden md:flex p-4 gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
                         <div className="relative flex-1">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
@@ -323,7 +324,7 @@ function App() {
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 animate-in">
                             <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10 ring-1 ring-white/5">
-                                {/* Click Area to Open Cart Modal */}
+                                {/* CLICK TO OPEN CART */}
                                 <div className="flex items-center gap-3 active:scale-95 transition-transform" onClick={() => setShowMobileCart(true)}>
                                     <div className="w-12 h-12 bg-[#2b2b40] rounded-full flex items-center justify-center text-[#6366f1] relative">
                                         <Icon name="shopping_bag" size={24}/>
@@ -614,7 +615,8 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                {/* MOBILE TOP NAV (FIXED) - MOVED HERE */}
+                
+                {/* --- MOBILE TOP NAVIGATION (MAIN MENU ICONS) --- */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -622,7 +624,7 @@ function App() {
                          </h1>
                          <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
                     </div>
-                    {/* Navigation Icons Row */}
+                    {/* Navigation Icons Row (Matches image_ce1960.png) */}
                     <div className="flex justify-around items-center px-2">
                         {getNavItems().map(item => (
                             <button 
@@ -636,7 +638,7 @@ function App() {
                     </div>
                 </div>
 
-                {/* Content */}
+                {/* Content Area with Top Padding to account for the fixed header */}
                 <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
@@ -688,22 +690,26 @@ function App() {
                             <button onClick={() => setShowMobileCart(false)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white"><Icon name="close"/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                            {cart.map(item => (
-                                <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between">
-                                    <div className="flex-1">
-                                        <div className="font-bold text-white">{item.name}</div>
-                                        <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
+                            {cart.length === 0 ? (
+                                <div className="text-center text-gray-500 py-10">Cart is empty</div>
+                            ) : (
+                                cart.map(item => (
+                                    <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between">
+                                        <div className="flex-1">
+                                            <div className="font-bold text-white">{item.name}</div>
+                                            <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
+                                            <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
+                                            <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>
+                                            <button onClick={() => updateCartQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white bg-[#6366f1] rounded-md active:scale-95"><Icon name="add" size={16}/></button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
-                                        <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
-                                        <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>
-                                        <button onClick={() => updateCartQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white bg-[#6366f1] rounded-md active:scale-95"><Icon name="add" size={16}/></button>
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                         <div className="p-4 bg-black/20 border-t border-white/5">
-                            <Button onClick={checkout} className="w-full py-4 text-lg bg-[#6366f1] hover:bg-[#4f46e5]">Checkout & Print</Button>
+                            <Button onClick={checkout} className="w-full py-4 text-lg bg-[#6366f1] hover:bg-[#4f46e5]" disabled={cart.length === 0}>Checkout & Print</Button>
                         </div>
                     </div>
                 </div>

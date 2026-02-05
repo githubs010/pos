@@ -108,7 +108,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v4'); // Incremented version to ensure fresh load if needed
+        const saved = localStorage.getItem('pos_data_v5'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -132,7 +132,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v4', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v5', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -286,7 +286,7 @@ function App() {
         </div>
     );
 
-    // --- REVISED POS VIEW (SPLIT SCREEN FOR DESKTOP) ---
+    // --- POS VIEW (RESPONSIVE SPLIT SCREEN) ---
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -295,8 +295,8 @@ function App() {
 
         return (
             <div className="flex h-full animate-in overflow-hidden">
-                {/* Left Side: Products (Full width on Mobile, Flexible on Desktop) */}
-                <div className="flex-1 flex flex-col h-full relative">
+                {/* Left Side: Products (Full width on Mobile, Flexible on Tablet/Desktop) */}
+                <div className="flex-1 flex flex-col h-full relative min-w-0"> 
                     <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10">
                         <div className="relative flex-1">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
@@ -304,7 +304,7 @@ function App() {
                         </div>
                     </div>
                     
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 lg:pb-4">
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 md:pb-4 no-scrollbar">
                         {filtered.map(p => (
                             <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
                                 const ex = prev.find(i => i.id === p.id);
@@ -321,9 +321,9 @@ function App() {
                         ))}
                     </div>
 
-                    {/* Mobile Only Floating Cart */}
+                    {/* Mobile Only Floating Cart (Hidden on md/tablet and up) */}
                     {cart.length > 0 && (
-                        <div className="lg:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
+                        <div className="md:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
                             <div className="glass-panel-heavy p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary relative">
@@ -341,10 +341,11 @@ function App() {
                     )}
                 </div>
 
-                {/* Right Side: Desktop Billing Sidebar (Hidden on Mobile) */}
-                <div className="hidden lg:flex w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full">
-                    <div className="p-6 border-b border-white/5">
+                {/* Right Side: Billing Sidebar (Visible on Tablet 'md' and up) */}
+                <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full shrink-0">
+                    <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
+                        {cart.length > 0 && <button onClick={()=>setCart([])} className="text-xs text-red-400 hover:text-red-300">Clear</button>}
                     </div>
                     
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -558,19 +559,32 @@ function App() {
                 <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-purple-900/20 rounded-full blur-[100px]"></div>
             </div>
 
-            <aside className="hidden lg:flex w-64 surface-dark flex-col z-50 h-full border-r border-white/5">
-                <div className="p-6"><h1 className="text-2xl font-bold">GL POS</h1></div>
-                <nav className="flex-1 px-4 space-y-2 mt-4">
+            <aside className="hidden md:flex w-20 lg:w-64 surface-dark flex-col z-50 h-full border-r border-white/5 transition-all">
+                <div className="p-4 lg:p-6 flex items-center justify-center lg:justify-start">
+                    <h1 className="text-xl lg:text-2xl font-bold lg:flex items-center gap-2">
+                        <span className="bg-primary px-2 py-0.5 rounded text-white hidden lg:block">GL</span>
+                        <span className="hidden lg:block">POS</span>
+                        <Icon name="point_of_sale" className="lg:hidden text-primary" size={32}/>
+                    </h1>
+                </div>
+                <nav className="flex-1 px-2 lg:px-4 space-y-2 mt-4">
                     {['pos', 'inventory', 'reports', 'users', 'settings'].map(id => (
-                        <button key={id} onClick={() => setView(id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl capitalize ${view === id ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>
-                            <Icon name={id === 'pos' ? 'shopping_cart' : id === 'inventory' ? 'inventory_2' : id === 'reports' ? 'analytics' : id === 'users' ? 'group' : 'settings'} size={20}/> {id}
+                        <button key={id} onClick={() => setView(id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === id ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                            <Icon name={id === 'pos' ? 'shopping_cart' : id === 'inventory' ? 'inventory_2' : id === 'reports' ? 'analytics' : id === 'users' ? 'group' : 'settings'} size={24}/> 
+                            <span className="hidden lg:inline">{id}</span>
                         </button>
                     ))}
                 </nav>
+                <div className="p-4 mt-auto border-t border-white/5 flex justify-center lg:justify-start">
+                    <button onClick={() => setView('login')} className="text-gray-500 hover:text-red-400 transition-colors flex items-center gap-2">
+                        <Icon name="logout" size={24}/>
+                        <span className="hidden lg:inline text-sm">Logout</span>
+                    </button>
+                </div>
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                <header className="lg:hidden flex justify-between items-center p-4 glass-panel sticky top-0 z-20">
+                <header className="md:hidden flex justify-between items-center p-4 glass-panel sticky top-0 z-20">
                     <h1 className="font-bold text-lg capitalize">{view}</h1>
                     <button onClick={() => setView('settings')}><Icon name="settings"/></button>
                 </header>
@@ -583,7 +597,7 @@ function App() {
                     {view === 'settings' && <SettingsView />}
                 </div>
 
-                <nav className="lg:hidden fixed bottom-6 left-6 right-6 glass-panel-heavy rounded-2xl flex justify-around items-center p-2 border border-white/10 shadow-2xl z-40">
+                <nav className="md:hidden fixed bottom-6 left-6 right-6 glass-panel-heavy rounded-2xl flex justify-around items-center p-2 border border-white/10 shadow-2xl z-40">
                     <button onClick={() => setView('reports')} className={`p-3 ${view === 'reports' ? 'text-primary' : 'text-gray-500'}`}><Icon name="analytics"/></button>
                     <button onClick={() => setView('pos')} className="w-16 h-16 rounded-full bg-primary flex items-center justify-center -mt-8 border-4 border-background-dark text-white"><Icon name="point_of_sale"/></button>
                     <button onClick={() => setView('inventory')} className={`p-3 ${view === 'inventory' ? 'text-primary' : 'text-gray-500'}`}><Icon name="inventory_2"/></button>

@@ -1,7 +1,6 @@
 const { useState, useEffect } = React;
 
 // --- ICONS ---
-// Using Material Symbols to match your screenshots
 const Icon = ({ name, size = 24, filled = false, className = "" }) => (
     <span className={`material-symbols-outlined ${className}`} 
           style={{ fontSize: size, fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}>
@@ -93,7 +92,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v15'); 
+        const saved = localStorage.getItem('pos_data_v16'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -117,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v15', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v16', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -256,10 +255,10 @@ function App() {
 
     // --- VIEWS ---
     const LoginView = () => (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-[#0f111a]">
-            <div className="glass-panel w-full max-w-sm p-8 rounded-3xl relative z-10 animate-in border border-white/5 bg-[#181b29]/50 backdrop-blur-xl">
+        <div className="min-h-screen flex items-center justify-center p-6 bg-background-dark">
+            <div className="glass-panel w-full max-w-sm p-8 rounded-3xl relative z-10 animate-in">
                 <div className="flex justify-center mb-6">
-                    <div className="w-16 h-16 rounded-2xl bg-[#6366f1] flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                    <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
                         <Icon name="point_of_sale" size={32} className="text-white"/>
                     </div>
                 </div>
@@ -286,38 +285,17 @@ function App() {
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
                     
-                    {/* MOBILE TOP NAVIGATION (Matching Sidebar Icons) */}
-                    <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
-                        <div className="flex justify-between items-center p-4 pb-2">
-                             <h1 className="font-bold text-lg flex items-center gap-2">
-                                <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white text-xs">GL</span> POS
-                             </h1>
-                             <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
-                        </div>
-                        <div className="flex justify-around items-center px-2">
-                            {getNavItems().map(item => (
-                                <button 
-                                    key={item.id} 
-                                    onClick={() => setView(item.id)}
-                                    className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'text-[#6366f1]' : 'text-gray-500'}`}
-                                >
-                                    <Icon name={item.icon} size={24} filled={view === item.id}/>
-                                </button>
-                            ))}
+                    {/* MOBILE SEARCH (Visible only on Mobile) */}
+                    <div className="md:hidden p-4 pb-0">
+                        <div className="relative">
+                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
+                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
                         </div>
                     </div>
 
                     {/* DESKTOP HEADER (Search) */}
                     <div className="hidden md:flex p-4 gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
                         <div className="relative flex-1">
-                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
-                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
-                        </div>
-                    </div>
-
-                    {/* MOBILE SEARCH (Below Top Nav) */}
-                    <div className="md:hidden mt-[100px] p-4 pb-0">
-                        <div className="relative">
                             <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
                             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
                         </div>
@@ -405,7 +383,7 @@ function App() {
     };
 
     const InventoryView = () => (
-        <div className="animate-in pt-[110px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in pt-[20px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <Button onClick={() => {
@@ -444,7 +422,7 @@ function App() {
     const ReportsView = () => {
         const [reportType, setReportType] = useState('sales'); 
         return (
-            <div className="animate-in pt-[110px] md:pt-0 flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
+            <div className="animate-in pt-[20px] md:pt-0 flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Analytics</h2>
                     <div className="flex gap-2 bg-[#181b29] p-1 rounded-lg">
@@ -512,7 +490,7 @@ function App() {
     const UsersView = () => {
          const [newUser, setNewUser] = useState({ name: '', username: '', password: '', role: 'Staff' });
          return (
-             <div className="animate-in pt-[110px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+             <div className="animate-in pt-[20px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
                  <h2 className="text-2xl font-bold mb-6">User Management</h2>
                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                      <div className="lg:col-span-3 space-y-3">
@@ -553,7 +531,7 @@ function App() {
     };
 
     const SettingsView = () => (
-        <div className="animate-in pt-[110px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in pt-[20px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
              <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
                 <h3 className="font-bold mb-4">Business Profile</h3>
@@ -595,6 +573,7 @@ function App() {
                 <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-purple-900/20 rounded-full blur-[100px]"></div>
             </div>
 
+            {/* SIDEBAR (DESKTOP) */}
             <aside className="hidden md:flex w-20 lg:w-64 bg-[#181b29] flex-col z-50 h-full border-r border-white/5 transition-all">
                 <div className="p-4 lg:p-6">
                     <h1 className="text-xl lg:text-2xl font-bold lg:flex items-center gap-2 justify-center lg:justify-start">
@@ -635,8 +614,30 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                {/* Content Area */}
-                <div className="flex-1 overflow-hidden h-full">
+                {/* MOBILE TOP NAV (FIXED) - MOVED HERE */}
+                <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
+                    <div className="flex justify-between items-center p-4 pb-2">
+                         <h1 className="font-bold text-lg flex items-center gap-2">
+                            <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white text-xs">GL</span> POS
+                         </h1>
+                         <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
+                    </div>
+                    {/* Navigation Icons Row */}
+                    <div className="flex justify-around items-center px-2">
+                        {getNavItems().map(item => (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setView(item.id)}
+                                className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'text-[#6366f1]' : 'text-gray-500'}`}
+                            >
+                                <Icon name={item.icon} size={24} filled={view === item.id}/>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
                     {view === 'reports' && user.role === 'Admin' && <ReportsView />}

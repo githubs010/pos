@@ -18,7 +18,7 @@ const Button = ({ children, onClick, variant = "primary", className = "", ...pro
         white: "bg-white text-slate-900 hover:bg-gray-100 border-transparent"
     };
     return (
-        <button onClick={onClick} className={`px-6 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
+        <button onClick={onClick} className={`px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
             {children}
         </button>
     );
@@ -92,7 +92,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v18'); 
+        const saved = localStorage.getItem('pos_data_v19'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -116,7 +116,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v18', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v19', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -286,7 +286,7 @@ function App() {
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
                     
-                    {/* MOBILE TOP NAV + HEADER */}
+                    {/* MOBILE TOP NAV (MAIN MENU ICONS) */}
                     <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                         <div className="flex justify-between items-center p-4 pb-2">
                              <h1 className="font-bold text-lg flex items-center gap-2">
@@ -363,7 +363,7 @@ function App() {
                     )}
                 </div>
 
-                {/* --- DESKTOP SIDEBARS (UPDATED WITH +/- BUTTONS) --- */}
+                {/* --- DESKTOP SIDEBARS --- */}
                 <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-[#181b29] h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
@@ -382,14 +382,12 @@ function App() {
                                         <div className="font-bold text-white text-sm truncate">{item.name}</div>
                                         <div className="text-xs text-gray-400">₹{item.price}</div>
                                     </div>
-                                    
                                     {/* Desktop Quantity Controls */}
                                     <div className="flex items-center gap-2 bg-[#0f111a] rounded-lg p-1 mx-2">
                                         <button onClick={() => updateCartQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"><Icon name="remove" size={14}/></button>
                                         <span className="font-mono font-bold w-4 text-center text-white text-xs">{item.quantity}</span>
                                         <button onClick={() => updateCartQty(item.id, 1)} className="w-6 h-6 flex items-center justify-center text-white bg-[#6366f1] hover:bg-[#4f46e5] rounded transition-colors"><Icon name="add" size={14}/></button>
                                     </div>
-
                                     <div className="font-bold text-white text-sm w-16 text-right">₹{(item.price * item.quantity).toFixed(2)}</div>
                                 </div>
                              ))
@@ -729,6 +727,7 @@ function App() {
                                             <div className="font-bold text-white">{item.name}</div>
                                             <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                         </div>
+                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>

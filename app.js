@@ -1,4 +1,4 @@
-const { useState, useEffect, useRef } = React;
+const { useState, useEffect } = React;
 
 // --- ICONS ---
 const Icon = ({ name, size = 24, filled = false, className = "" }) => (
@@ -107,9 +107,12 @@ function App() {
     const [user, setUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
     
+    // Editor State
+    const [editingItem, setEditingItem] = useState(null);
+    
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v6'); 
+        const saved = localStorage.getItem('pos_data_v7'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -133,7 +136,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v6', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v7', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -142,6 +145,7 @@ function App() {
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
     
+    // Stock Logic
     const adjustStock = (productId, delta, reason) => {
         const product = data.products.find(p => p.id === productId);
         if(!product) return;
@@ -165,6 +169,21 @@ function App() {
             products: newProducts,
             stockLog: [logEntry, ...prev.stockLog]
         }));
+    };
+
+    // Item Management Logic
+    const deleteItem = (id) => {
+        if(confirm("Are you sure you want to delete this item?")) {
+            const newProducts = data.products.filter(p => p.id !== id);
+            setData(prev => ({ ...prev, products: newProducts }));
+        }
+    };
+
+    const saveEditedItem = () => {
+        if(!editingItem) return;
+        const newProducts = data.products.map(p => p.id === editingItem.id ? editingItem : p);
+        setData(prev => ({ ...prev, products: newProducts }));
+        setEditingItem(null);
     };
 
     const checkout = () => {
@@ -252,12 +271,9 @@ function App() {
         }
     };
 
-    // --- CLOUD SYNC LOGIC ---
-    
-    // Manual Sync (with alerts)
+    // --- AUTO SYNC ---
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
-        
         setIsSyncing(true);
         try {
             await fetch(`https://api.github.com/gists/${ghConfig.gistId}`, {
@@ -275,17 +291,23 @@ function App() {
         }
     };
 
-    // Auto-Sync Effect (Debounced)
     useEffect(() => {
         if(!ghConfig.token || !ghConfig.gistId) return;
-
-        // Debounce timer: Wait 5 seconds after last change before syncing
-        const timer = setTimeout(() => {
-            syncCloud(true); // Silent sync
-        }, 5000);
-
+        const timer = setTimeout(() => { syncCloud(true); }, 5000);
         return () => clearTimeout(timer);
     }, [data, ghConfig]);
+
+    // --- NAVIGATION FILTER ---
+    const getNavItems = () => {
+        const allNav = [
+            { id: 'pos', icon: 'shopping_cart', label: 'POS', roles: ['Admin', 'Staff'] },
+            { id: 'inventory', icon: 'inventory_2', label: 'Inventory', roles: ['Admin'] },
+            { id: 'reports', icon: 'analytics', label: 'Reports', roles: ['Admin'] },
+            { id: 'users', icon: 'group', label: 'Users', roles: ['Admin'] },
+            { id: 'settings', icon: 'settings', label: 'Settings', roles: ['Admin'] }
+        ];
+        return allNav.filter(item => item.roles.includes(user?.role || 'Staff'));
+    };
 
     // --- VIEWS ---
     const LoginView = () => (
@@ -310,16 +332,13 @@ function App() {
         </div>
     );
 
-    // --- POS VIEW ---
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-        
         const currentTotal = cart.reduce((a,b) => a + (b.price * b.quantity), 0);
 
         return (
             <div className="flex h-full animate-in overflow-hidden">
-                {/* Left Side: Products */}
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
                     <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10">
                         <div className="relative flex-1">
@@ -327,7 +346,6 @@ function App() {
                             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-surface-dark border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-colors text-sm text-white"/>
                         </div>
                     </div>
-                    
                     <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 md:pb-4 no-scrollbar">
                         {filtered.map(p => (
                             <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
@@ -344,8 +362,6 @@ function App() {
                             </button>
                         ))}
                     </div>
-
-                    {/* Mobile Only Floating Cart */}
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-24 left-4 right-4 z-50 animate-in">
                             <div className="glass-panel-heavy p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10">
@@ -364,14 +380,11 @@ function App() {
                         </div>
                     )}
                 </div>
-
-                {/* Right Side: Billing Sidebar */}
                 <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
                         {cart.length > 0 && <button onClick={()=>setCart([])} className="text-xs text-red-400 hover:text-red-300">Clear</button>}
                     </div>
-                    
                     <div className="flex-1 overflow-y-auto p-4 space-y-2">
                         {cart.length === 0 ? (
                              <div className="h-full flex flex-col items-center justify-center text-gray-500 opacity-50">
@@ -390,7 +403,6 @@ function App() {
                              ))
                         )}
                     </div>
-
                     <div className="p-6 bg-black/20 border-t border-white/5">
                         <div className="space-y-2 mb-4">
                             <div className="flex justify-between text-sm text-gray-400">
@@ -402,9 +414,7 @@ function App() {
                                 <span>₹{currentTotal.toFixed(2)}</span>
                             </div>
                         </div>
-                        <Button onClick={checkout} className="w-full py-4 text-base" disabled={cart.length===0}>
-                            Generate Bill & Print
-                        </Button>
+                        <Button onClick={checkout} className="w-full py-4 text-base" disabled={cart.length===0}>Generate Bill & Print</Button>
                     </div>
                 </div>
             </div>
@@ -422,24 +432,28 @@ function App() {
                     if(n && p && s) {
                         const newId = Date.now();
                         updateData('products', [...data.products, { id: newId, name: n, price: p, category: 'General', stock: s }]);
-                        setData(prev => ({
-                            ...prev, 
-                            stockLog: [{ id: Date.now(), date: new Date().toISOString(), type: 'IN', prodName: n, qty: s, reason: 'New Item' }, ...prev.stockLog]
-                        }));
+                        setData(prev => ({ ...prev, stockLog: [{ id: Date.now(), date: new Date().toISOString(), type: 'IN', prodName: n, qty: s, reason: 'New Item' }, ...prev.stockLog] }));
                     }
                 }} size="sm"><Icon name="add"/> Add Item</Button>
             </div>
             <div className="grid gap-3">
                 {data.products.map(p => (
                     <div key={p.id} className="glass-card p-3 rounded-xl flex items-center justify-between border-white/5">
-                        <div>
+                        <div className="flex-1">
                             <div className="font-bold text-white">{p.name}</div>
                             <div className="text-xs text-gray-400">₹{p.price}</div>
                         </div>
-                        <div className="flex items-center gap-3 bg-surface-dark px-2 py-1 rounded-lg border border-white/5">
-                            <button onClick={() => adjustStock(p.id, -1, 'Manual Correction')} className="text-gray-400 hover:text-white"><Icon name="remove" size={18}/></button>
-                            <span className="w-6 text-center font-mono text-sm">{p.stock}</span>
-                            <button onClick={() => adjustStock(p.id, 1, 'Stock Restock')} className="text-primary hover:text-white"><Icon name="add" size={18}/></button>
+                        <div className="flex items-center gap-4">
+                             {/* Actions */}
+                            <button onClick={() => setEditingItem(p)} className="text-blue-400 hover:text-white"><Icon name="edit" size={20}/></button>
+                            <button onClick={() => deleteItem(p.id)} className="text-red-400 hover:text-red-200"><Icon name="delete" size={20}/></button>
+                            
+                            {/* Quick Stock */}
+                            <div className="flex items-center gap-3 bg-surface-dark px-2 py-1 rounded-lg border border-white/5">
+                                <button onClick={() => adjustStock(p.id, -1, 'Manual Correction')} className="text-gray-400 hover:text-white"><Icon name="remove" size={18}/></button>
+                                <span className="w-6 text-center font-mono text-sm">{p.stock}</span>
+                                <button onClick={() => adjustStock(p.id, 1, 'Stock Restock')} className="text-primary hover:text-white"><Icon name="add" size={18}/></button>
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -458,7 +472,6 @@ function App() {
                         <button onClick={()=>setReportType('stock')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='stock' ? 'bg-primary text-white' : 'text-gray-400'}`}>Stock</button>
                     </div>
                 </div>
-
                 {reportType === 'sales' ? (
                     <div className="grid grid-cols-2 gap-4">
                         <div className="glass-card p-5 rounded-2xl relative overflow-hidden col-span-2 bg-gradient-to-br from-white/5 to-transparent">
@@ -543,6 +556,13 @@ function App() {
                                  <Input label="Name" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
                                  <Input label="Username" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} />
                                  <Input label="Password" type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                                 <div className="mb-4">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-wider">Role</label>
+                                    <select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} className="w-full px-4 py-3 bg-input-bg border border-white/5 rounded-xl text-white text-sm outline-none">
+                                        <option value="Staff">Staff (POS Only)</option>
+                                        <option value="Admin">Admin (Full Access)</option>
+                                    </select>
+                                 </div>
                                  <Button className="w-full" onClick={() => { if(newUser.username) updateData('users', [...data.users, { ...newUser, id: Date.now() }]); }}>Create</Button>
                              </div>
                          </div>
@@ -590,7 +610,6 @@ function App() {
                         <span className="hidden lg:block">POS</span>
                         <Icon name="point_of_sale" className="lg:hidden text-primary" size={32}/>
                     </h1>
-                    {/* Sync Status */}
                     <div className="mt-4 flex justify-center lg:justify-start">
                         {isSyncing ? (
                             <div className="flex items-center gap-2 text-[10px] text-yellow-400 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-500/20">
@@ -608,10 +627,10 @@ function App() {
                     </div>
                 </div>
                 <nav className="flex-1 px-2 lg:px-4 space-y-2 mt-4">
-                    {['pos', 'inventory', 'reports', 'users', 'settings'].map(id => (
-                        <button key={id} onClick={() => setView(id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === id ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
-                            <Icon name={id === 'pos' ? 'shopping_cart' : id === 'inventory' ? 'inventory_2' : id === 'reports' ? 'analytics' : id === 'users' ? 'group' : 'settings'} size={24}/> 
-                            <span className="hidden lg:inline">{id}</span>
+                    {getNavItems().map(item => (
+                        <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === item.id ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                            <Icon name={item.icon} size={24}/> 
+                            <span className="hidden lg:inline">{item.label}</span>
                         </button>
                     ))}
                 </nav>
@@ -626,24 +645,25 @@ function App() {
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
                 <header className="md:hidden flex justify-between items-center p-4 glass-panel sticky top-0 z-20">
                     <h1 className="font-bold text-lg capitalize">{view}</h1>
-                    <button onClick={() => setView('settings')}><Icon name="settings"/></button>
+                    {user?.role === 'Admin' && <button onClick={() => setView('settings')}><Icon name="settings"/></button>}
                 </header>
 
                 <div className="flex-1 overflow-hidden h-full">
                     {view === 'pos' && <POSView />}
-                    {view === 'inventory' && <InventoryView />}
-                    {view === 'reports' && <ReportsView />}
-                    {view === 'users' && <UsersView />}
-                    {view === 'settings' && <SettingsView />}
+                    {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
+                    {view === 'reports' && user.role === 'Admin' && <ReportsView />}
+                    {view === 'users' && user.role === 'Admin' && <UsersView />}
+                    {view === 'settings' && user.role === 'Admin' && <SettingsView />}
                 </div>
 
                 <nav className="md:hidden fixed bottom-6 left-6 right-6 glass-panel-heavy rounded-2xl flex justify-around items-center p-2 border border-white/10 shadow-2xl z-40">
-                    <button onClick={() => setView('reports')} className={`p-3 ${view === 'reports' ? 'text-primary' : 'text-gray-500'}`}><Icon name="analytics"/></button>
+                    <button onClick={() => user.role === 'Admin' && setView('reports')} className={`p-3 ${view === 'reports' ? 'text-primary' : 'text-gray-500'}`} disabled={user.role !== 'Admin'}><Icon name="analytics"/></button>
                     <button onClick={() => setView('pos')} className="w-16 h-16 rounded-full bg-primary flex items-center justify-center -mt-8 border-4 border-background-dark text-white"><Icon name="point_of_sale"/></button>
-                    <button onClick={() => setView('inventory')} className={`p-3 ${view === 'inventory' ? 'text-primary' : 'text-gray-500'}`}><Icon name="inventory_2"/></button>
+                    <button onClick={() => user.role === 'Admin' && setView('inventory')} className={`p-3 ${view === 'inventory' ? 'text-primary' : 'text-gray-500'}`} disabled={user.role !== 'Admin'}><Icon name="inventory_2"/></button>
                 </nav>
             </main>
 
+            {/* Receipt Modal */}
             {receiptTx && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in">
                     <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-white/10">
@@ -671,6 +691,23 @@ function App() {
                         <div className="p-4 grid grid-cols-2 gap-3">
                             <Button onClick={() => handlePrint(receiptTx)} variant="secondary"><Icon name="print"/> Print</Button>
                             <Button onClick={() => generateReceiptPDF(receiptTx, data.profile)}><Icon name="download"/> PDF</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Item Modal */}
+            {editingItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in">
+                    <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 border border-white/10">
+                        <h3 className="font-bold mb-4 text-lg">Edit Item</h3>
+                        <div className="space-y-4">
+                            <Input label="Name" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} />
+                            <Input label="Price (₹)" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} />
+                            <div className="flex gap-4 pt-2">
+                                <Button onClick={() => setEditingItem(null)} variant="secondary" className="flex-1">Cancel</Button>
+                                <Button onClick={saveEditedItem} className="flex-1">Save</Button>
+                            </div>
                         </div>
                     </div>
                 </div>

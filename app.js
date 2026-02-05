@@ -522,4 +522,248 @@ function App() {
          const [newUser, setNewUser] = useState({ name: '', username: '', password: '', role: 'Staff' });
          return (
              <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
-                 <h2 className="text-
+                 <h2 className="text-2xl font-bold mb-6">User Management</h2>
+                 <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                     <div className="lg:col-span-3 space-y-3">
+                         {data.users.map(u => (
+                             <div key={u.id} className="bg-white/5 p-4 rounded-xl flex items-center justify-between border border-white/5">
+                                 <div className="flex items-center gap-4">
+                                     <div className="w-10 h-10 rounded-full bg-[#6366f1] flex items-center justify-center text-white font-bold">{u.username[0].toUpperCase()}</div>
+                                     <div>
+                                         <div className="font-bold text-white">{u.name}</div>
+                                         <div className="text-xs text-gray-400 bg-white/10 px-2 py-0.5 rounded-full w-fit mt-1">{u.role}</div>
+                                     </div>
+                                 </div>
+                                 {u.username !== 'admin' && <button className="text-gray-500 hover:text-red-400" onClick={() => updateData('users', data.users.filter(x => x.id !== u.id))}><Icon name="delete"/></button>}
+                             </div>
+                         ))}
+                     </div>
+                     <div className="lg:col-span-2">
+                         <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                             <h3 className="font-bold mb-4">Create User</h3>
+                             <div className="space-y-4">
+                                 <Input label="Name" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
+                                 <Input label="Username" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} />
+                                 <Input label="Password" type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
+                                 <div className="mb-4">
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-wider">Role</label>
+                                    <select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} className="w-full px-4 py-3 bg-[#23263a] border border-white/5 rounded-xl text-white text-sm outline-none">
+                                        <option value="Staff">Staff (POS Only)</option>
+                                        <option value="Admin">Admin (Full Access)</option>
+                                    </select>
+                                 </div>
+                                 <Button className="w-full" onClick={() => { if(newUser.username) updateData('users', [...data.users, { ...newUser, id: Date.now() }]); }}>Create</Button>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+             </div>
+         );
+    };
+
+    const SettingsView = () => (
+        <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
+            <h2 className="text-2xl font-bold mb-6">Settings</h2>
+             <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
+                <h3 className="font-bold mb-4">Business Profile</h3>
+                <div className="space-y-4">
+                    <Input label="Business Name" value={data.profile.name} onChange={e => updateData('profile', {...data.profile, name: e.target.value})} />
+                    <Input label="Address" value={data.profile.address} onChange={e => updateData('profile', {...data.profile, address: e.target.value})} />
+                    <Input label="Phone" value={data.profile.phone} onChange={e => updateData('profile', {...data.profile, phone: e.target.value})} />
+                </div>
+            </div>
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                <h3 className="font-bold mb-4">Cloud Backup</h3>
+                <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
+                <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
+                
+                {ghConfig.gistId ? (
+                     <Input label="Gist ID" value={ghConfig.gistId} onChange={e=>setGhConfig({...ghConfig, gistId: e.target.value})} />
+                ) : (
+                    <div className="bg-white/5 p-3 rounded-xl mb-4 text-center">
+                        <p className="text-sm mb-3">No Database Connected</p>
+                        <Button onClick={createCloudDatabase} className="w-full bg-emerald-600 hover:bg-emerald-500">Create New Database</Button>
+                    </div>
+                )}
+                
+                {ghConfig.gistId && (
+                    <div className="flex gap-4 mt-4">
+                        <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync Now</Button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    if(view === 'login') return <LoginView />;
+
+    return (
+        <div className="flex h-screen w-full relative overflow-hidden bg-[#0f111a]">
+            <div className="fixed inset-0 pointer-events-none">
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#6366f1]/10 rounded-full blur-[120px]"></div>
+                <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-purple-900/20 rounded-full blur-[100px]"></div>
+            </div>
+
+            {/* SIDEBAR (DESKTOP) */}
+            <aside className="hidden md:flex w-20 lg:w-64 bg-[#181b29] flex-col z-50 h-full border-r border-white/5 transition-all">
+                <div className="p-4 lg:p-6">
+                    <h1 className="text-xl lg:text-2xl font-bold lg:flex items-center gap-2 justify-center lg:justify-start">
+                        <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white hidden lg:block">GL</span>
+                        <span className="hidden lg:block">POS</span>
+                        <Icon name="point_of_sale" className="lg:hidden text-[#6366f1]" size={32}/>
+                    </h1>
+                    <div className="mt-4 flex justify-center lg:justify-start">
+                        {isSyncing ? (
+                            <div className="flex items-center gap-2 text-[10px] text-yellow-400 bg-yellow-900/20 px-2 py-1 rounded border border-yellow-500/20">
+                                <Icon name="sync" size={14} className="animate-spin"/> <span className="hidden lg:inline">Saving...</span>
+                            </div>
+                        ) : isOnline ? (
+                            <div className="flex items-center gap-2 text-[10px] text-emerald-400 bg-emerald-900/20 px-2 py-1 rounded border border-emerald-500/20">
+                                <Icon name="cloud_done" size={14}/> <span className="hidden lg:inline">Cloud Synced</span>
+                            </div>
+                        ) : (
+                             <div className="flex items-center gap-2 text-[10px] text-gray-400 bg-gray-800 px-2 py-1 rounded border border-gray-700">
+                                <Icon name="cloud_off" size={14}/> <span className="hidden lg:inline">Local Only</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+                <nav className="flex-1 px-2 lg:px-4 space-y-2 mt-4">
+                    {getNavItems().map(item => (
+                        <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === item.id ? 'bg-[#6366f1] text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                            <Icon name={item.icon} size={24}/> 
+                            <span className="hidden lg:inline">{item.label}</span>
+                        </button>
+                    ))}
+                </nav>
+                <div className="p-4 mt-auto border-t border-white/5 flex justify-center lg:justify-start">
+                    <button onClick={() => setView('login')} className="text-gray-500 hover:text-red-400 transition-colors flex items-center gap-2">
+                        <Icon name="logout" size={24}/>
+                        <span className="hidden lg:inline text-sm">Logout</span>
+                    </button>
+                </div>
+            </aside>
+
+            <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
+                
+                {/* --- MOBILE TOP NAVIGATION (MAIN MENU ICONS) --- */}
+                <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
+                    <div className="flex justify-between items-center p-4 pb-2">
+                         <h1 className="font-bold text-lg flex items-center gap-2">
+                            <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white text-xs">GL</span> POS
+                         </h1>
+                         <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
+                    </div>
+                    {/* Navigation Icons Row (Matches image_ce1960.png) */}
+                    <div className="flex justify-around items-center px-2">
+                        {getNavItems().map(item => (
+                            <button 
+                                key={item.id} 
+                                onClick={() => setView(item.id)}
+                                className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'text-[#6366f1]' : 'text-gray-500'}`}
+                            >
+                                <Icon name={item.icon} size={24} filled={view === item.id}/>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Content Area with Top Padding to account for the fixed header */}
+                <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
+                    {view === 'pos' && <POSView />}
+                    {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
+                    {view === 'reports' && user.role === 'Admin' && <ReportsView />}
+                    {view === 'users' && user.role === 'Admin' && <UsersView />}
+                    {view === 'settings' && user.role === 'Admin' && <SettingsView />}
+                </div>
+            </main>
+
+            {/* Receipt Modal */}
+            {receiptTx && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in">
+                    <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+                        <div className="p-4 flex justify-between items-center border-b border-white/5">
+                            <h3 className="font-bold">Bill Generated</h3>
+                            <button onClick={()=>setReceiptTx(null)}><Icon name="close"/></button>
+                        </div>
+                        <div className="p-6 bg-white text-black font-mono text-sm relative">
+                            <div className="text-center mb-4">
+                                <div className="font-bold text-lg">{data.profile.name}</div>
+                                <div className="text-xs text-gray-500">{data.profile.address}</div>
+                            </div>
+                            <div className="border-b border-dashed border-gray-300 my-2"></div>
+                            {receiptTx.items.map((i,idx) => (
+                                <div key={idx} className="flex justify-between mb-1">
+                                    <span>{i.name} x{i.quantity}</span>
+                                    <span>{(i.price*i.quantity).toFixed(2)}</span>
+                                </div>
+                            ))}
+                            <div className="border-t border-dashed border-gray-300 my-2 pt-2 flex justify-between font-bold text-lg">
+                                <span>Total</span>
+                                <span>₹{receiptTx.total.toFixed(2)}</span>
+                            </div>
+                        </div>
+                        <div className="p-4 grid grid-cols-2 gap-3">
+                            <Button onClick={() => handlePrint(receiptTx)} variant="secondary"><Icon name="print"/> Print</Button>
+                            <Button onClick={() => generateReceiptPDF(receiptTx, data.profile)}><Icon name="download"/> PDF</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MOBILE CART MODAL (Bottom Sheet) */}
+            {showMobileCart && (
+                <div className="md:hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-in">
+                    <div className="bg-[#1e1e2d] rounded-t-3xl w-full max-h-[80vh] flex flex-col border-t border-white/10 shadow-2xl">
+                        <div className="p-4 border-b border-white/5 flex justify-between items-center">
+                            <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="shopping_cart"/> Current Cart</h2>
+                            <button onClick={() => setShowMobileCart(false)} className="p-2 bg-white/5 rounded-full text-gray-400 hover:text-white"><Icon name="close"/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                            {cart.length === 0 ? (
+                                <div className="text-center text-gray-500 py-10">Cart is empty</div>
+                            ) : (
+                                cart.map(item => (
+                                    <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between">
+                                        <div className="flex-1">
+                                            <div className="font-bold text-white">{item.name}</div>
+                                            <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
+                                        </div>
+                                        <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
+                                            <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
+                                            <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>
+                                            <button onClick={() => updateCartQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white bg-[#6366f1] rounded-md active:scale-95"><Icon name="add" size={16}/></button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <div className="p-4 bg-black/20 border-t border-white/5">
+                            <Button onClick={checkout} className="w-full py-4 text-lg bg-[#6366f1] hover:bg-[#4f46e5]" disabled={cart.length === 0}>Checkout & Print</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Item Modal */}
+            {editingItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in">
+                    <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 border border-white/10">
+                        <h3 className="font-bold mb-4 text-lg">Edit Item</h3>
+                        <div className="space-y-4">
+                            <Input label="Name" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} />
+                            <Input label="Price (₹)" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} />
+                            <div className="flex gap-4 pt-2">
+                                <Button onClick={() => setEditingItem(null)} variant="secondary" className="flex-1">Cancel</Button>
+                                <Button onClick={saveEditedItem} className="flex-1">Save</Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);

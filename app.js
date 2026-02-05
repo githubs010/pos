@@ -1,6 +1,7 @@
 const { useState, useEffect } = React;
 
 // --- ICONS ---
+// Using Material Symbols to match your screenshots
 const Icon = ({ name, size = 24, filled = false, className = "" }) => (
     <span className={`material-symbols-outlined ${className}`} 
           style={{ fontSize: size, fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}>
@@ -11,14 +12,14 @@ const Icon = ({ name, size = 24, filled = false, className = "" }) => (
 // --- UI COMPONENTS ---
 const Button = ({ children, onClick, variant = "primary", className = "", ...props }) => {
     const variants = {
-        primary: "bg-primary hover:bg-primary-hover text-white shadow-lg shadow-indigo-500/20 border-transparent",
+        primary: "bg-[#6366f1] hover:bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/20 border-transparent",
         secondary: "bg-white/10 hover:bg-white/20 text-white border border-white/10",
         danger: "bg-red-500/80 hover:bg-red-500 text-white",
         ghost: "hover:bg-white/5 text-white/70 hover:text-white",
         white: "bg-white text-slate-900 hover:bg-gray-100 border-transparent"
     };
     return (
-        <button onClick={onClick} className={`px-6 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
+        <button onClick={onClick} className={`px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
             {children}
         </button>
     );
@@ -27,7 +28,7 @@ const Button = ({ children, onClick, variant = "primary", className = "", ...pro
 const Input = ({ label, ...props }) => (
     <div className="mb-4 w-full">
         {label && <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-wider">{label}</label>}
-        <input className="w-full px-4 py-3 bg-input-bg border border-white/5 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all placeholder:text-gray-600 text-white text-sm" {...props} />
+        <input className="w-full px-4 py-3 bg-[#23263a] border border-white/5 rounded-xl focus:ring-2 focus:ring-[#6366f1] focus:border-transparent outline-none transition-all placeholder:text-gray-600 text-white text-sm" {...props} />
     </div>
 );
 
@@ -92,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v14'); 
+        const saved = localStorage.getItem('pos_data_v15'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100 },
@@ -116,7 +117,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v14', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v15', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -255,10 +256,10 @@ function App() {
 
     // --- VIEWS ---
     const LoginView = () => (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-background-dark">
-            <div className="glass-panel w-full max-w-sm p-8 rounded-3xl relative z-10 animate-in">
+        <div className="min-h-screen flex items-center justify-center p-6 bg-[#0f111a]">
+            <div className="glass-panel w-full max-w-sm p-8 rounded-3xl relative z-10 animate-in border border-white/5 bg-[#181b29]/50 backdrop-blur-xl">
                 <div className="flex justify-center mb-6">
-                    <div className="w-16 h-16 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
+                    <div className="w-16 h-16 rounded-2xl bg-[#6366f1] flex items-center justify-center shadow-lg shadow-indigo-500/30">
                         <Icon name="point_of_sale" size={32} className="text-white"/>
                     </div>
                 </div>
@@ -284,36 +285,67 @@ function App() {
         return (
             <div className="flex h-full animate-in overflow-hidden">
                 <div className="flex-1 flex flex-col h-full relative min-w-0"> 
-                    {/* Header */}
-                    <div className="p-4 flex gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
-                        <div className="relative flex-1">
-                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
-                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-surface-dark border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-primary transition-colors text-sm text-white"/>
+                    
+                    {/* MOBILE TOP NAVIGATION (Matching Sidebar Icons) */}
+                    <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
+                        <div className="flex justify-between items-center p-4 pb-2">
+                             <h1 className="font-bold text-lg flex items-center gap-2">
+                                <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white text-xs">GL</span> POS
+                             </h1>
+                             <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
+                        </div>
+                        <div className="flex justify-around items-center px-2">
+                            {getNavItems().map(item => (
+                                <button 
+                                    key={item.id} 
+                                    onClick={() => setView(item.id)}
+                                    className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'text-[#6366f1]' : 'text-gray-500'}`}
+                                >
+                                    <Icon name={item.icon} size={24} filled={view === item.id}/>
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Product Grid */}
-                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-32 md:pb-4 no-scrollbar">
+                    {/* DESKTOP HEADER (Search) */}
+                    <div className="hidden md:flex p-4 gap-4 bg-[#0f111a]/90 backdrop-blur-md z-10 sticky top-0">
+                        <div className="relative flex-1">
+                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
+                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
+                        </div>
+                    </div>
+
+                    {/* MOBILE SEARCH (Below Top Nav) */}
+                    <div className="md:hidden mt-[100px] p-4 pb-0">
+                        <div className="relative">
+                            <Icon name="search" className="absolute left-3 top-3 text-gray-500" size={20}/>
+                            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search items..." className="w-full bg-[#181b29] border border-white/10 rounded-xl py-3 pl-10 pr-4 outline-none focus:border-[#6366f1] transition-colors text-sm text-white"/>
+                        </div>
+                    </div>
+
+                    {/* PRODUCT GRID */}
+                    <div className="p-4 grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 overflow-y-auto pb-48 md:pb-4 no-scrollbar">
                         {filtered.map(p => (
                             <button key={p.id} onClick={() => p.stock > 0 && setCart(prev => {
                                 const ex = prev.find(i => i.id === p.id);
                                 return ex ? prev.map(i => i.id === p.id ? {...i, quantity: i.quantity+1}:i) : [...prev, {...p, quantity:1}];
-                            })} disabled={p.stock <= 0} className="glass-card p-4 rounded-2xl flex flex-col items-start text-left hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all relative overflow-hidden group border-white/5">
-                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center mb-3 text-indigo-300 group-hover:text-white transition-colors">
+                            })} disabled={p.stock <= 0} className="bg-[#181b29]/60 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex flex-col items-start text-left hover:bg-white/10 active:scale-95 disabled:opacity-50 transition-all relative overflow-hidden group">
+                                <div className="w-10 h-10 rounded-lg bg-[#6366f1]/20 flex items-center justify-center mb-3 text-[#818cf8] group-hover:text-white transition-colors">
                                     <span className="font-bold text-lg">{p.name[0]}</span>
                                 </div>
                                 <div className="font-bold text-white leading-tight mb-1">{p.name}</div>
                                 <div className="text-xs text-gray-400 mb-2">{p.stock} in stock</div>
-                                <div className="font-mono text-primary font-bold">₹{p.price.toFixed(2)}</div>
+                                <div className="font-mono text-[#6366f1] font-bold">₹{p.price.toFixed(2)}</div>
                                 {p.stock <= 0 && <div className="absolute top-2 right-2 bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded font-bold">OUT</div>}
                             </button>
                         ))}
                     </div>
                     
-                    {/* --- MOBILE FLOATING UI --- */}
+                    {/* --- MOBILE FLOATING BILL BAR --- */}
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 animate-in">
-                            <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/5">
+                            <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10 ring-1 ring-white/5">
+                                {/* Click Area to Open Cart Modal */}
                                 <div className="flex items-center gap-3 active:scale-95 transition-transform" onClick={() => setShowMobileCart(true)}>
                                     <div className="w-12 h-12 bg-[#2b2b40] rounded-full flex items-center justify-center text-[#6366f1] relative">
                                         <Icon name="shopping_bag" size={24}/>
@@ -330,8 +362,8 @@ function App() {
                     )}
                 </div>
 
-                {/* --- DESKTOP SIDEBARS --- */}
-                <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-surface-dark h-full shrink-0">
+                {/* --- DESKTOP SIDEBARS (unchanged) --- */}
+                <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-[#181b29] h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
                         {cart.length > 0 && <button onClick={()=>setCart([])} className="text-xs text-red-400 hover:text-red-300">Clear</button>}
@@ -344,12 +376,12 @@ function App() {
                              </div>
                         ) : (
                              cart.map(item => (
-                                <div key={item.id} className="glass-card p-3 rounded-xl flex items-center justify-between group">
+                                <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between group">
                                     <div>
                                         <div className="font-bold text-white text-sm">{item.name}</div>
                                         <div className="text-xs text-gray-400">₹{item.price} x {item.quantity}</div>
                                     </div>
-                                    <div className="font-bold text-primary">₹{(item.price * item.quantity).toFixed(2)}</div>
+                                    <div className="font-bold text-[#6366f1]">₹{(item.price * item.quantity).toFixed(2)}</div>
                                 </div>
                              ))
                         )}
@@ -373,7 +405,7 @@ function App() {
     };
 
     const InventoryView = () => (
-        <div className="animate-in pb-24 lg:pb-0 p-4 lg:p-8 overflow-y-auto h-full">
+        <div className="animate-in pt-[110px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <Button onClick={() => {
@@ -389,7 +421,7 @@ function App() {
             </div>
             <div className="grid gap-3">
                 {data.products.map(p => (
-                    <div key={p.id} className="glass-card p-3 rounded-xl flex items-center justify-between border-white/5">
+                    <div key={p.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between border border-white/5">
                         <div className="flex-1">
                             <div className="font-bold text-white">{p.name}</div>
                             <div className="text-xs text-gray-400">₹{p.price}</div>
@@ -397,10 +429,10 @@ function App() {
                         <div className="flex items-center gap-4">
                             <button onClick={() => setEditingItem(p)} className="text-blue-400 hover:text-white"><Icon name="edit" size={20}/></button>
                             <button onClick={() => deleteItem(p.id)} className="text-red-400 hover:text-red-200"><Icon name="delete" size={20}/></button>
-                            <div className="flex items-center gap-3 bg-surface-dark px-2 py-1 rounded-lg border border-white/5">
+                            <div className="flex items-center gap-3 bg-[#181b29] px-2 py-1 rounded-lg border border-white/5">
                                 <button onClick={() => adjustStock(p.id, -1, 'Manual Correction')} className="text-gray-400 hover:text-white"><Icon name="remove" size={18}/></button>
                                 <span className="w-6 text-center font-mono text-sm">{p.stock}</span>
-                                <button onClick={() => adjustStock(p.id, 1, 'Stock Restock')} className="text-primary hover:text-white"><Icon name="add" size={18}/></button>
+                                <button onClick={() => adjustStock(p.id, 1, 'Stock Restock')} className="text-[#6366f1] hover:text-white"><Icon name="add" size={18}/></button>
                             </div>
                         </div>
                     </div>
@@ -412,22 +444,22 @@ function App() {
     const ReportsView = () => {
         const [reportType, setReportType] = useState('sales'); 
         return (
-            <div className="animate-in flex flex-col gap-6 pb-24 lg:pb-0 p-4 lg:p-8 overflow-y-auto h-full">
+            <div className="animate-in pt-[110px] md:pt-0 flex flex-col gap-6 p-4 lg:p-8 overflow-y-auto h-full">
                 <div className="flex justify-between items-center">
                     <h2 className="text-2xl font-bold">Analytics</h2>
-                    <div className="flex gap-2 bg-surface-dark p-1 rounded-lg">
-                        <button onClick={()=>setReportType('sales')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='sales' ? 'bg-primary text-white' : 'text-gray-400'}`}>Sales</button>
-                        <button onClick={()=>setReportType('stock')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='stock' ? 'bg-primary text-white' : 'text-gray-400'}`}>Stock</button>
+                    <div className="flex gap-2 bg-[#181b29] p-1 rounded-lg">
+                        <button onClick={()=>setReportType('sales')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='sales' ? 'bg-[#6366f1] text-white' : 'text-gray-400'}`}>Sales</button>
+                        <button onClick={()=>setReportType('stock')} className={`px-3 py-1 text-xs rounded-md transition-colors ${reportType==='stock' ? 'bg-[#6366f1] text-white' : 'text-gray-400'}`}>Stock</button>
                     </div>
                 </div>
                 {reportType === 'sales' ? (
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="glass-card p-5 rounded-2xl relative overflow-hidden col-span-2 bg-gradient-to-br from-white/5 to-transparent">
+                        <div className="bg-white/5 p-5 rounded-2xl relative overflow-hidden col-span-2 bg-gradient-to-br from-white/5 to-transparent">
                             <div className="absolute top-0 right-0 p-4 opacity-10"><Icon name="trending_up" size={64}/></div>
                             <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Total Revenue</div>
                             <div className="text-3xl font-bold mt-1 text-white">₹{data.sales.reduce((a,b)=>a+b.total,0).toFixed(2)}</div>
                         </div>
-                        <div className="glass-card p-4 rounded-2xl col-span-2">
+                        <div className="bg-white/5 p-4 rounded-2xl col-span-2">
                              <div className="flex justify-between items-center mb-2">
                                 <h3 className="font-bold">Recent Sales</h3>
                             </div>
@@ -442,7 +474,7 @@ function App() {
                         </div>
                     </div>
                 ) : (
-                    <div className="glass-card p-4 rounded-2xl h-[500px] flex flex-col">
+                    <div className="bg-white/5 p-4 rounded-2xl h-[500px] flex flex-col">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold">Stock Movement</h3>
                             <Button size="sm" onClick={() => generateStockReportPDF(data.stockLog, data.profile)}><Icon name="download" size={16}/> PDF</Button>
@@ -480,14 +512,14 @@ function App() {
     const UsersView = () => {
          const [newUser, setNewUser] = useState({ name: '', username: '', password: '', role: 'Staff' });
          return (
-             <div className="animate-in h-full overflow-y-auto pb-24 lg:pb-0 p-4 lg:p-8">
+             <div className="animate-in pt-[110px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
                  <h2 className="text-2xl font-bold mb-6">User Management</h2>
                  <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                      <div className="lg:col-span-3 space-y-3">
                          {data.users.map(u => (
-                             <div key={u.id} className="ref-card p-4 rounded-xl flex items-center justify-between">
+                             <div key={u.id} className="bg-white/5 p-4 rounded-xl flex items-center justify-between border border-white/5">
                                  <div className="flex items-center gap-4">
-                                     <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">{u.username[0].toUpperCase()}</div>
+                                     <div className="w-10 h-10 rounded-full bg-[#6366f1] flex items-center justify-center text-white font-bold">{u.username[0].toUpperCase()}</div>
                                      <div>
                                          <div className="font-bold text-white">{u.name}</div>
                                          <div className="text-xs text-gray-400 bg-white/10 px-2 py-0.5 rounded-full w-fit mt-1">{u.role}</div>
@@ -498,7 +530,7 @@ function App() {
                          ))}
                      </div>
                      <div className="lg:col-span-2">
-                         <div className="ref-card p-6 rounded-2xl">
+                         <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
                              <h3 className="font-bold mb-4">Create User</h3>
                              <div className="space-y-4">
                                  <Input label="Name" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} />
@@ -506,7 +538,7 @@ function App() {
                                  <Input label="Password" type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} />
                                  <div className="mb-4">
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-wider">Role</label>
-                                    <select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} className="w-full px-4 py-3 bg-input-bg border border-white/5 rounded-xl text-white text-sm outline-none">
+                                    <select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} className="w-full px-4 py-3 bg-[#23263a] border border-white/5 rounded-xl text-white text-sm outline-none">
                                         <option value="Staff">Staff (POS Only)</option>
                                         <option value="Admin">Admin (Full Access)</option>
                                     </select>
@@ -521,9 +553,9 @@ function App() {
     };
 
     const SettingsView = () => (
-        <div className="animate-in h-full overflow-y-auto pb-24 lg:pb-0 p-4 lg:p-8">
+        <div className="animate-in pt-[110px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
-             <div className="ref-card p-6 rounded-2xl mb-6">
+             <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
                 <h3 className="font-bold mb-4">Business Profile</h3>
                 <div className="space-y-4">
                     <Input label="Business Name" value={data.profile.name} onChange={e => updateData('profile', {...data.profile, name: e.target.value})} />
@@ -531,7 +563,7 @@ function App() {
                     <Input label="Phone" value={data.profile.phone} onChange={e => updateData('profile', {...data.profile, phone: e.target.value})} />
                 </div>
             </div>
-            <div className="ref-card p-6 rounded-2xl">
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
                 <h3 className="font-bold mb-4">Cloud Backup</h3>
                 <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
                 <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
@@ -557,18 +589,18 @@ function App() {
     if(view === 'login') return <LoginView />;
 
     return (
-        <div className="flex h-screen w-full relative overflow-hidden bg-background-dark">
+        <div className="flex h-screen w-full relative overflow-hidden bg-[#0f111a]">
             <div className="fixed inset-0 pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-primary/10 rounded-full blur-[120px]"></div>
+                <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-[#6366f1]/10 rounded-full blur-[120px]"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[400px] h-[400px] bg-purple-900/20 rounded-full blur-[100px]"></div>
             </div>
 
-            <aside className="hidden md:flex w-20 lg:w-64 surface-dark flex-col z-50 h-full border-r border-white/5 transition-all">
+            <aside className="hidden md:flex w-20 lg:w-64 bg-[#181b29] flex-col z-50 h-full border-r border-white/5 transition-all">
                 <div className="p-4 lg:p-6">
                     <h1 className="text-xl lg:text-2xl font-bold lg:flex items-center gap-2 justify-center lg:justify-start">
-                        <span className="bg-primary px-2 py-0.5 rounded text-white hidden lg:block">GL</span>
+                        <span className="bg-[#6366f1] px-2 py-0.5 rounded text-white hidden lg:block">GL</span>
                         <span className="hidden lg:block">POS</span>
-                        <Icon name="point_of_sale" className="lg:hidden text-primary" size={32}/>
+                        <Icon name="point_of_sale" className="lg:hidden text-[#6366f1]" size={32}/>
                     </h1>
                     <div className="mt-4 flex justify-center lg:justify-start">
                         {isSyncing ? (
@@ -588,7 +620,7 @@ function App() {
                 </div>
                 <nav className="flex-1 px-2 lg:px-4 space-y-2 mt-4">
                     {getNavItems().map(item => (
-                        <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === item.id ? 'bg-primary text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+                        <button key={item.id} onClick={() => setView(item.id)} className={`w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl capitalize transition-colors ${view === item.id ? 'bg-[#6366f1] text-white shadow-lg shadow-indigo-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
                             <Icon name={item.icon} size={24}/> 
                             <span className="hidden lg:inline">{item.label}</span>
                         </button>
@@ -603,30 +635,8 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                {/* Mobile Top Header (Fixed with Menu Items) */}
-                <header className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
-                    <div className="flex justify-between items-center p-4 pb-2">
-                         <h1 className="font-bold text-lg flex items-center gap-2">
-                            <span className="bg-primary px-2 py-0.5 rounded text-white text-xs">GL</span> POS
-                         </h1>
-                         <button onClick={() => setView('login')} className="text-xs text-gray-500">Logout</button>
-                    </div>
-                    {/* Navigation Icons Row */}
-                    <div className="flex justify-around items-center px-2">
-                        {getNavItems().map(item => (
-                            <button 
-                                key={item.id} 
-                                onClick={() => setView(item.id)}
-                                className={`p-2 rounded-xl flex flex-col items-center gap-1 transition-all ${view === item.id ? 'bg-white/10 text-white' : 'text-gray-500'}`}
-                            >
-                                <Icon name={item.icon} size={22} filled={view === item.id}/>
-                                <span className="text-[10px] capitalize">{item.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </header>
-
-                <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
+                {/* Content Area */}
+                <div className="flex-1 overflow-hidden h-full">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
                     {view === 'reports' && user.role === 'Admin' && <ReportsView />}
@@ -668,7 +678,7 @@ function App() {
                 </div>
             )}
 
-            {/* MOBILE CART MODAL */}
+            {/* MOBILE CART MODAL (Bottom Sheet) */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-in">
                     <div className="bg-[#1e1e2d] rounded-t-3xl w-full max-h-[80vh] flex flex-col border-t border-white/10 shadow-2xl">
@@ -678,24 +688,20 @@ function App() {
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
                             {cart.map(item => (
-                                <div key={item.id} className="glass-card p-3 rounded-xl flex items-center justify-between">
+                                <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between">
                                     <div className="flex-1">
                                         <div className="font-bold text-white">{item.name}</div>
-                                        <div className="text-sm text-primary font-bold">₹{item.price}</div>
+                                        <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                     </div>
                                     <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                         <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                         <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>
-                                        <button onClick={() => updateCartQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white bg-primary rounded-md active:scale-95"><Icon name="add" size={16}/></button>
+                                        <button onClick={() => updateCartQty(item.id, 1)} className="w-8 h-8 flex items-center justify-center text-white bg-[#6366f1] rounded-md active:scale-95"><Icon name="add" size={16}/></button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                         <div className="p-4 bg-black/20 border-t border-white/5">
-                            <div className="flex justify-between items-center mb-4 text-lg font-bold">
-                                <span className="text-gray-400">Total Amount</span>
-                                <span className="text-white text-xl">₹{cart.reduce((a,b)=>a+(b.price*b.quantity),0).toFixed(2)}</span>
-                            </div>
                             <Button onClick={checkout} className="w-full py-4 text-lg bg-[#6366f1] hover:bg-[#4f46e5]">Checkout & Print</Button>
                         </div>
                     </div>

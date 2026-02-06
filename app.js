@@ -93,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v36'); 
+        const saved = localStorage.getItem('pos_data_v37'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -112,8 +112,6 @@ function App() {
     });
 
     const [cart, setCart] = useState([]);
-    
-    // CONFIGS
     const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
     const [sheetConfig, setSheetConfig] = useState(() => JSON.parse(localStorage.getItem('sheet_config')) || { url: '' });
     
@@ -121,7 +119,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v36', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v37', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -165,23 +163,39 @@ function App() {
         setEditingItem(null);
     };
 
-    // --- GOOGLE SYNC FUNCTION (AUTO) ---
+    // --- FULL GOOGLE SYNC (AUTO) ---
     const syncToGoogleSheet = async (currentData) => {
         if(!sheetConfig.url) return; 
         try {
+            // Prepare Sales (Flat)
             const flatSales = currentData.sales.map(s => ({
                 id: s.id, date: s.date, total: s.total, cashier: s.cashier,
                 items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
             }));
-            
-            // Fire and forget (no await blocking)
+
+            // Prepare Settings (Flat)
+            const settingsExport = [
+                { section: "Profile", key: "Name", value: currentData.profile.name },
+                { section: "Profile", key: "Address", value: currentData.profile.address },
+                { section: "Profile", key: "Phone", value: currentData.profile.phone },
+                { section: "GitHub", key: "Gist ID", value: ghConfig.gistId || "N/A" }
+            ];
+
+            // Send EVERYTHING
             fetch(sheetConfig.url, {
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "text/plain" }, 
-                body: JSON.stringify({ type: 'PUSH', sales: flatSales, inventory: currentData.products })
+                body: JSON.stringify({ 
+                    type: 'PUSH', 
+                    inventory: currentData.products,
+                    sales: flatSales,
+                    stockLog: currentData.stockLog, // Added full logs
+                    users: currentData.users,       // Added users
+                    settings: settingsExport        // Added settings
+                })
             });
-            console.log("Auto-synced to Google Sheet");
+            console.log("Auto-synced full database to Google Sheet");
         } catch(e) { console.error("Sync failed", e); }
     };
 
@@ -255,7 +269,7 @@ function App() {
         if(printArea) { printArea.innerHTML = printContent; window.print(); }
     };
 
-    // --- EXCEL LOGIC (5 SHEETS) ---
+    // --- FULL EXCEL EXPORT (5 SHEETS) ---
     const exportToExcel = () => {
         if(!window.XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
         const wb = XLSX.utils.book_new();
@@ -287,7 +301,7 @@ function App() {
         const wsUsers = XLSX.utils.json_to_sheet(data.users);
         XLSX.utils.book_append_sheet(wb, wsUsers, "Users");
 
-        // 5. Settings (Profile & Keys)
+        // 5. App Settings
         const settingsData = [
             { Section: "Business Profile", Key: "Business Name", Value: data.profile.name },
             { Section: "Business Profile", Key: "Address", Value: data.profile.address },
@@ -299,7 +313,6 @@ function App() {
         const wsSettings = XLSX.utils.json_to_sheet(settingsData);
         XLSX.utils.book_append_sheet(wb, wsSettings, "App_Settings");
 
-        // Download
         XLSX.writeFile(wb, "POS_Full_Database.xlsx");
     };
 

@@ -15,7 +15,8 @@ const Button = ({ children, onClick, variant = "primary", className = "", ...pro
         secondary: "bg-white/10 hover:bg-white/20 text-white border border-white/10",
         danger: "bg-red-500/80 hover:bg-red-500 text-white",
         ghost: "hover:bg-white/5 text-white/70 hover:text-white",
-        white: "bg-white text-slate-900 hover:bg-gray-100 border-transparent"
+        white: "bg-white text-slate-900 hover:bg-gray-100 border-transparent",
+        success: "bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-500/20 border-transparent"
     };
     return (
         <button onClick={onClick} className={`px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 border disabled:opacity-50 disabled:cursor-not-allowed text-sm ${variants[variant]} ${className}`} {...props}>
@@ -92,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v26'); 
+        const saved = localStorage.getItem('pos_data_v27'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -116,7 +117,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v26', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v27', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -201,8 +202,62 @@ function App() {
         if(printArea) { printArea.innerHTML = printContent; window.print(); }
     };
 
+    // --- EXCEL LOGIC ---
+    const exportToExcel = () => {
+        if(!window.XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
+        
+        const wb = XLSX.utils.book_new();
+        
+        // Products Sheet
+        const wsProducts = XLSX.utils.json_to_sheet(data.products);
+        XLSX.utils.book_append_sheet(wb, wsProducts, "Inventory");
+        
+        // Sales Sheet (Flattened for better view)
+        const flatSales = data.sales.map(s => ({
+            BillID: s.id,
+            Date: new Date(s.date).toLocaleString(),
+            Cashier: s.cashier,
+            Total: s.total,
+            Items: s.items.map(i => `${i.name} (x${i.quantity})`).join(", ")
+        }));
+        const wsSales = XLSX.utils.json_to_sheet(flatSales);
+        XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
+
+        XLSX.writeFile(wb, "POS_Data_Backup.xlsx");
+    };
+
+    const importFromExcel = (e) => {
+        if(!window.XLSX) { alert("Excel library not loaded."); return; }
+        const file = e.target.files[0];
+        if(!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const bstr = evt.target.result;
+                const wb = XLSX.read(bstr, { type: 'binary' });
+                
+                const wsName = wb.SheetNames.find(n => n === "Inventory");
+                if(wsName) {
+                    const ws = wb.Sheets[wsName];
+                    const importedProducts = XLSX.utils.sheet_to_json(ws);
+                    
+                    // Simple merge: Replace inventory with imported data if confirmed
+                    if(confirm(`Found ${importedProducts.length} items in Excel. Replace current inventory?`)) {
+                        updateData('products', importedProducts);
+                        alert("Inventory Updated Successfully!");
+                    }
+                } else {
+                    alert("Could not find 'Inventory' sheet in the file.");
+                }
+            } catch(error) {
+                alert("Error reading file: " + error.message);
+            }
+        };
+        reader.readAsBinaryString(file);
+    };
+
     // --- CLOUD LOGIC ---
-    // 1. Create Cloud Database
     const createCloudDatabase = async () => {
         if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
         setIsSyncing(true);
@@ -222,7 +277,6 @@ function App() {
         } catch(e) { alert("Error: " + e.message); } finally { setIsSyncing(false); }
     };
 
-    // 2. Sync (PUSH) Local -> Cloud
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         setIsSyncing(true);
@@ -237,30 +291,6 @@ function App() {
         } catch(e) { setIsOnline(false); if(!silent) alert("Sync Failed"); } finally { setIsSyncing(false); }
     };
 
-    // 3. Load (PULL) Cloud -> Local
-    const loadFromCloud = async () => {
-        if(!ghConfig.token || !ghConfig.gistId) { alert("Please enter GitHub Token and Gist ID."); return; }
-        setIsSyncing(true);
-        try {
-            const res = await fetch(`https://api.github.com/gists/${ghConfig.gistId}`, {
-                headers: { "Authorization": `token ${ghConfig.token}` }
-            });
-            const json = await res.json();
-            if(json.files && json.files["pos_data.json"]) {
-                const cloudData = JSON.parse(json.files["pos_data.json"].content);
-                setData(cloudData);
-                alert("Data Successfully Loaded from Cloud!");
-            } else {
-                alert("No valid POS data found in this Gist ID.");
-            }
-        } catch(e) { 
-            alert("Load Failed: " + e.message); 
-        } finally { 
-            setIsSyncing(false); 
-        }
-    };
-
-    // Auto-sync effect
     useEffect(() => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         const timer = setTimeout(() => { syncCloud(true); }, 5000);
@@ -578,6 +608,20 @@ function App() {
                     <Input label="Phone" value={data.profile.phone} onChange={e => updateData('profile', {...data.profile, phone: e.target.value})} />
                 </div>
             </div>
+            
+            {/* EXCEL EXPORT/IMPORT SECTION */}
+            <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
+                <h3 className="font-bold mb-4">Excel Data Manager</h3>
+                <p className="text-xs text-gray-400 mb-4">Export your data to Excel or restore from an Excel file.</p>
+                <div className="flex gap-4 mb-4">
+                    <Button onClick={exportToExcel} variant="success" className="flex-1"><Icon name="download"/> Export Excel</Button>
+                    <label className="flex-1 cursor-pointer bg-[#6366f1] hover:bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/20 px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 text-sm">
+                        <Icon name="upload"/> Import Excel
+                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={importFromExcel} />
+                    </label>
+                </div>
+            </div>
+
             <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
                 <h3 className="font-bold mb-4">Cloud Backup</h3>
                 <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
@@ -595,7 +639,6 @@ function App() {
                 {ghConfig.gistId && (
                     <div className="flex gap-4 mt-4">
                         <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync (Push)</Button>
-                        <Button onClick={loadFromCloud} variant="primary" className="flex-1">Load (Pull)</Button>
                     </div>
                 )}
             </div>
@@ -652,9 +695,7 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                
-                {/* --- MOBILE TOP NAVIGATION (FIXED & SINGLE) --- */}
-                {/* Only visible on mobile, z-index 50 to stay on top */}
+                {/* MOBILE TOP NAV (FIXED & SINGLE) */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -737,7 +778,6 @@ function App() {
                                             <div className="font-bold text-white">{item.name}</div>
                                             <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                         </div>
-                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>

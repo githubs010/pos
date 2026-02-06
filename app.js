@@ -93,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v35'); 
+        const saved = localStorage.getItem('pos_data_v36'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -112,16 +112,16 @@ function App() {
     });
 
     const [cart, setCart] = useState([]);
-    const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
     
-    // --- UPDATED: Default is EMPTY string so you can decide the URL ---
+    // CONFIGS
+    const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
     const [sheetConfig, setSheetConfig] = useState(() => JSON.parse(localStorage.getItem('sheet_config')) || { url: '' });
     
     const [isOnline, setIsOnline] = useState(false);
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v35', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v36', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -165,10 +165,9 @@ function App() {
         setEditingItem(null);
     };
 
-    // --- GOOGLE SYNC FUNCTION (HIDDEN AUTO) ---
+    // --- GOOGLE SYNC FUNCTION (AUTO) ---
     const syncToGoogleSheet = async (currentData) => {
-        if(!sheetConfig.url) return; // Do nothing if no URL set
-        
+        if(!sheetConfig.url) return; 
         try {
             const flatSales = currentData.sales.map(s => ({
                 id: s.id, date: s.date, total: s.total, cashier: s.cashier,
@@ -256,23 +255,52 @@ function App() {
         if(printArea) { printArea.innerHTML = printContent; window.print(); }
     };
 
-    // --- EXCEL LOGIC ---
+    // --- EXCEL LOGIC (5 SHEETS) ---
     const exportToExcel = () => {
         if(!window.XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
         const wb = XLSX.utils.book_new();
         
-        // Inventory
+        // 1. Inventory
         const wsProducts = XLSX.utils.json_to_sheet(data.products);
         XLSX.utils.book_append_sheet(wb, wsProducts, "Inventory");
         
-        // Sales
+        // 2. Sales
         const flatSales = data.sales.map(s => ({
             BillID: s.id, Date: new Date(s.date).toLocaleString(), Cashier: s.cashier, Total: s.total,
             Items: s.items.map(i => `${i.name} (x${i.quantity})`).join(", ")
         }));
         const wsSales = XLSX.utils.json_to_sheet(flatSales);
         XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
-        XLSX.writeFile(wb, "POS_Data_Backup.xlsx");
+
+        // 3. Stock Logs
+        const flatLogs = data.stockLog.map(l => ({
+            Date: new Date(l.date).toLocaleString(),
+            Type: l.type,
+            Item: l.prodName,
+            Qty: l.qty,
+            Reason: l.reason
+        }));
+        const wsLogs = XLSX.utils.json_to_sheet(flatLogs);
+        XLSX.utils.book_append_sheet(wb, wsLogs, "Stock_Logs");
+
+        // 4. Users
+        const wsUsers = XLSX.utils.json_to_sheet(data.users);
+        XLSX.utils.book_append_sheet(wb, wsUsers, "Users");
+
+        // 5. Settings (Profile & Keys)
+        const settingsData = [
+            { Section: "Business Profile", Key: "Business Name", Value: data.profile.name },
+            { Section: "Business Profile", Key: "Address", Value: data.profile.address },
+            { Section: "Business Profile", Key: "Phone", Value: data.profile.phone },
+            { Section: "Google Cloud Sync", Key: "Web App URL", Value: sheetConfig.url || "Not Set" },
+            { Section: "Cloud Backup (Gist)", Key: "GitHub Token", Value: ghConfig.token || "Not Set" },
+            { Section: "Cloud Backup (Gist)", Key: "Gist ID", Value: ghConfig.gistId || "Not Set" }
+        ];
+        const wsSettings = XLSX.utils.json_to_sheet(settingsData);
+        XLSX.utils.book_append_sheet(wb, wsSettings, "App_Settings");
+
+        // Download
+        XLSX.writeFile(wb, "POS_Full_Database.xlsx");
     };
 
     const importFromExcel = (e) => {
@@ -298,7 +326,7 @@ function App() {
         reader.readAsBinaryString(file);
     };
 
-    // --- CLOUD LOGIC ---
+    // --- CLOUD LOGIC (GITHUB) ---
     const createCloudDatabase = async () => {
         if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
         setIsSyncing(true);
@@ -344,6 +372,12 @@ function App() {
             } else { alert("No POS data found."); }
         } catch(e) { alert("Load Failed: " + e.message); } finally { setIsSyncing(false); }
     };
+
+    useEffect(() => {
+        if(!ghConfig.token || !ghConfig.gistId) return;
+        const timer = setTimeout(() => { syncCloud(true); }, 5000);
+        return () => clearTimeout(timer);
+    }, [data, ghConfig]);
 
     // --- NAVIGATION FILTER ---
     const getNavItems = () => {
@@ -836,6 +870,7 @@ function App() {
                                             <div className="font-bold text-white">{item.name}</div>
                                             <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                         </div>
+                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>

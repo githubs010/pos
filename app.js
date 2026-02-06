@@ -93,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v34'); 
+        const saved = localStorage.getItem('pos_data_v35'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -114,14 +114,14 @@ function App() {
     const [cart, setCart] = useState([]);
     const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
     
-    // Config for Google Sheets
+    // --- UPDATED: Default is EMPTY string so you can decide the URL ---
     const [sheetConfig, setSheetConfig] = useState(() => JSON.parse(localStorage.getItem('sheet_config')) || { url: '' });
     
     const [isOnline, setIsOnline] = useState(false);
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v34', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v35', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -167,7 +167,8 @@ function App() {
 
     // --- GOOGLE SYNC FUNCTION (HIDDEN AUTO) ---
     const syncToGoogleSheet = async (currentData) => {
-        if(!sheetConfig.url) return;
+        if(!sheetConfig.url) return; // Do nothing if no URL set
+        
         try {
             const flatSales = currentData.sales.map(s => ({
                 id: s.id, date: s.date, total: s.total, cashier: s.cashier,
@@ -183,6 +184,24 @@ function App() {
             });
             console.log("Auto-synced to Google Sheet");
         } catch(e) { console.error("Sync failed", e); }
+    };
+
+    const loadFromGoogleSheet = async () => {
+        if(!sheetConfig.url) return alert("Please enter Google Script URL first.");
+        setIsSyncing(true);
+        try {
+            const res = await fetch(sheetConfig.url);
+            const cloudData = await res.json();
+            
+            if(cloudData && cloudData.inventory) {
+                if(confirm("Replace current inventory with Cloud data?")) {
+                    updateData('products', cloudData.inventory);
+                    alert("Inventory Loaded from Cloud!");
+                }
+            } else {
+                alert("No valid inventory data found in cloud.");
+            }
+        } catch(e) { alert("Load Error: " + e.message); } finally { setIsSyncing(false); }
     };
 
     const checkout = () => {
@@ -651,6 +670,11 @@ function App() {
                 
                 <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Google Cloud Sync</h4>
                 <Input label="Web App URL" value={sheetConfig.url} onChange={e=>setSheetConfig({...sheetConfig, url: e.target.value})} placeholder="https://script.google.com/..." />
+                
+                <div className="flex gap-4">
+                    <Button onClick={() => syncToGoogleSheet(data)} className="flex-1"><Icon name="cloud_upload"/> Sync (Push)</Button>
+                    <Button onClick={loadFromGoogleSheet} variant="secondary" className="flex-1"><Icon name="cloud_download"/> Load (Pull)</Button>
+                </div>
             </div>
 
             <div className="bg-white/5 p-6 rounded-2xl border border-white/5">

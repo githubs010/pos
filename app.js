@@ -93,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v32'); 
+        const saved = localStorage.getItem('pos_data_v34'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -114,14 +114,14 @@ function App() {
     const [cart, setCart] = useState([]);
     const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
     
-    // UPDATED: No longer hardcoded. Empty by default so you can paste your own.
+    // Config for Google Sheets
     const [sheetConfig, setSheetConfig] = useState(() => JSON.parse(localStorage.getItem('sheet_config')) || { url: '' });
     
     const [isOnline, setIsOnline] = useState(false);
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v32', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v34', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -211,8 +211,12 @@ function App() {
     const exportToExcel = () => {
         if(!window.XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
         const wb = XLSX.utils.book_new();
+        
+        // Inventory
         const wsProducts = XLSX.utils.json_to_sheet(data.products);
         XLSX.utils.book_append_sheet(wb, wsProducts, "Inventory");
+        
+        // Sales
         const flatSales = data.sales.map(s => ({
             BillID: s.id, Date: new Date(s.date).toLocaleString(), Cashier: s.cashier, Total: s.total,
             Items: s.items.map(i => `${i.name} (x${i.quantity})`).join(", ")
@@ -806,7 +810,6 @@ function App() {
                                             <div className="font-bold text-white">{item.name}</div>
                                             <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                         </div>
-                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>

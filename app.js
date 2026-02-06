@@ -93,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v27'); 
+        const saved = localStorage.getItem('pos_data_v28'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -113,15 +113,17 @@ function App() {
 
     const [cart, setCart] = useState([]);
     const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
+    const [sheetConfig, setSheetConfig] = useState(() => JSON.parse(localStorage.getItem('sheet_config')) || { url: '' });
     const [isOnline, setIsOnline] = useState(false);
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v27', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v28', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
     }, [ghConfig]);
+    useEffect(() => localStorage.setItem('sheet_config', JSON.stringify(sheetConfig)), [sheetConfig]);
 
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
@@ -205,24 +207,15 @@ function App() {
     // --- EXCEL LOGIC ---
     const exportToExcel = () => {
         if(!window.XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
-        
         const wb = XLSX.utils.book_new();
-        
-        // Products Sheet
         const wsProducts = XLSX.utils.json_to_sheet(data.products);
         XLSX.utils.book_append_sheet(wb, wsProducts, "Inventory");
-        
-        // Sales Sheet (Flattened for better view)
         const flatSales = data.sales.map(s => ({
-            BillID: s.id,
-            Date: new Date(s.date).toLocaleString(),
-            Cashier: s.cashier,
-            Total: s.total,
+            BillID: s.id, Date: new Date(s.date).toLocaleString(), Cashier: s.cashier, Total: s.total,
             Items: s.items.map(i => `${i.name} (x${i.quantity})`).join(", ")
         }));
         const wsSales = XLSX.utils.json_to_sheet(flatSales);
         XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
-
         XLSX.writeFile(wb, "POS_Data_Backup.xlsx");
     };
 
@@ -230,53 +223,26 @@ function App() {
         if(!window.XLSX) { alert("Excel library not loaded."); return; }
         const file = e.target.files[0];
         if(!file) return;
-
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
                 const bstr = evt.target.result;
                 const wb = XLSX.read(bstr, { type: 'binary' });
-                
                 const wsName = wb.SheetNames.find(n => n === "Inventory");
                 if(wsName) {
                     const ws = wb.Sheets[wsName];
                     const importedProducts = XLSX.utils.sheet_to_json(ws);
-                    
-                    // Simple merge: Replace inventory with imported data if confirmed
-                    if(confirm(`Found ${importedProducts.length} items in Excel. Replace current inventory?`)) {
+                    if(confirm(`Found ${importedProducts.length} items. Replace current inventory?`)) {
                         updateData('products', importedProducts);
-                        alert("Inventory Updated Successfully!");
+                        alert("Inventory Updated!");
                     }
-                } else {
-                    alert("Could not find 'Inventory' sheet in the file.");
-                }
-            } catch(error) {
-                alert("Error reading file: " + error.message);
-            }
+                } else { alert("Could not find 'Inventory' sheet."); }
+            } catch(error) { alert("Error reading file: " + error.message); }
         };
         reader.readAsBinaryString(file);
     };
 
     // --- CLOUD LOGIC ---
-    const createCloudDatabase = async () => {
-        if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
-        setIsSyncing(true);
-        try {
-            const res = await fetch("https://api.github.com/gists", {
-                method: "POST",
-                headers: { "Authorization": `token ${ghConfig.token}`, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
-                body: JSON.stringify({ description: "GL POS Database", public: false, files: { "pos_data.json": { content: JSON.stringify(data) } } })
-            });
-            const json = await res.json();
-            if(!res.ok) throw new Error(json.message || "GitHub refused the connection.");
-            if(json.id) {
-                setGhConfig(prev => ({ ...prev, gistId: json.id }));
-                alert("Database Created Successfully! Auto-sync is now active.");
-                setIsOnline(true);
-            }
-        } catch(e) { alert("Error: " + e.message); } finally { setIsSyncing(false); }
-    };
-
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         setIsSyncing(true);
@@ -287,8 +253,42 @@ function App() {
                 body: JSON.stringify({ files: { "pos_data.json": { content: JSON.stringify(data) } } })
             });
             setIsOnline(true);
-            if(!silent) alert("Synced to Cloud!");
+            if(!silent) alert("Synced to GitHub!");
         } catch(e) { setIsOnline(false); if(!silent) alert("Sync Failed"); } finally { setIsSyncing(false); }
+    };
+
+    const loadFromCloud = async () => {
+        if(!ghConfig.token || !ghConfig.gistId) { alert("Please enter GitHub Token and Gist ID."); return; }
+        setIsSyncing(true);
+        try {
+            const res = await fetch(`https://api.github.com/gists/${ghConfig.gistId}`, { headers: { "Authorization": `token ${ghConfig.token}` } });
+            const json = await res.json();
+            if(json.files && json.files["pos_data.json"]) {
+                setData(JSON.parse(json.files["pos_data.json"].content));
+                alert("Data Loaded from GitHub!");
+            } else { alert("No POS data found."); }
+        } catch(e) { alert("Load Failed: " + e.message); } finally { setIsSyncing(false); }
+    };
+
+    // --- GOOGLE SHEET SYNC ---
+    const syncToGoogleSheet = async () => {
+        if(!sheetConfig.url) return alert("Please enter Google Script URL first.");
+        setIsSyncing(true);
+        try {
+            // Flatten sales for easier sheet reading
+            const flatSales = data.sales.map(s => ({
+                id: s.id, date: s.date, total: s.total, cashier: s.cashier,
+                items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
+            }));
+            
+            await fetch(sheetConfig.url, {
+                method: "POST",
+                mode: "no-cors", // Google Scripts requires no-cors for simple posts
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ type: 'SYNC', sales: flatSales, inventory: data.products })
+            });
+            alert("Sent to Google Sheet! (Note: Updates may take a moment)");
+        } catch(e) { alert("Sheet Error: " + e.message); } finally { setIsSyncing(false); }
     };
 
     useEffect(() => {
@@ -609,22 +609,25 @@ function App() {
                 </div>
             </div>
             
-            {/* EXCEL EXPORT/IMPORT SECTION */}
+            {/* EXCEL & GOOGLE SHEET SYNC */}
             <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
-                <h3 className="font-bold mb-4">Excel Data Manager</h3>
-                <p className="text-xs text-gray-400 mb-4">Export your data to Excel or restore from an Excel file.</p>
-                <div className="flex gap-4 mb-4">
+                <h3 className="font-bold mb-4">Data Management</h3>
+                <div className="flex gap-4 mb-6">
                     <Button onClick={exportToExcel} variant="success" className="flex-1"><Icon name="download"/> Export Excel</Button>
-                    <label className="flex-1 cursor-pointer bg-[#6366f1] hover:bg-[#4f46e5] text-white shadow-lg shadow-indigo-500/20 px-4 py-3 rounded-xl font-medium transition-all active:scale-95 flex items-center justify-center gap-2 text-sm">
+                    <label className="flex-1 cursor-pointer bg-[#6366f1] hover:bg-[#4f46e5] text-white shadow-lg px-4 py-3 rounded-xl font-medium flex items-center justify-center gap-2 text-sm">
                         <Icon name="upload"/> Import Excel
                         <input type="file" accept=".xlsx, .xls" className="hidden" onChange={importFromExcel} />
                     </label>
                 </div>
+                
+                <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Google Sheet Integration</h4>
+                <Input label="Web App URL" value={sheetConfig.url} onChange={e=>setSheetConfig({...sheetConfig, url: e.target.value})} placeholder="https://script.google.com/..." />
+                <Button onClick={syncToGoogleSheet} className="w-full"><Icon name="sync"/> Sync to Google Sheet</Button>
             </div>
 
             <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
-                <h3 className="font-bold mb-4">Cloud Backup</h3>
-                <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
+                <h3 className="font-bold mb-4">Cloud Backup (Gist)</h3>
+                <p className="text-xs text-gray-400 mb-4">Connect to GitHub for full database backup.</p>
                 <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
                 
                 {ghConfig.gistId ? (
@@ -639,6 +642,7 @@ function App() {
                 {ghConfig.gistId && (
                     <div className="flex gap-4 mt-4">
                         <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync (Push)</Button>
+                        <Button onClick={loadFromCloud} variant="primary" className="flex-1">Load (Pull)</Button>
                     </div>
                 )}
             </div>

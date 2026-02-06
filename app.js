@@ -93,7 +93,7 @@ function App() {
     
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v28'); 
+        const saved = localStorage.getItem('pos_data_v29'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -118,7 +118,7 @@ function App() {
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v28', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v29', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -242,7 +242,26 @@ function App() {
         reader.readAsBinaryString(file);
     };
 
-    // --- CLOUD LOGIC ---
+    // --- CLOUD & SHEET SYNC ---
+    const createCloudDatabase = async () => {
+        if(!ghConfig.token) { alert("Please enter a GitHub Token first."); return; }
+        setIsSyncing(true);
+        try {
+            const res = await fetch("https://api.github.com/gists", {
+                method: "POST",
+                headers: { "Authorization": `token ${ghConfig.token}`, "Accept": "application/vnd.github.v3+json", "Content-Type": "application/json" },
+                body: JSON.stringify({ description: "GL POS Database", public: false, files: { "pos_data.json": { content: JSON.stringify(data) } } })
+            });
+            const json = await res.json();
+            if(!res.ok) throw new Error(json.message || "GitHub refused the connection.");
+            if(json.id) {
+                setGhConfig(prev => ({ ...prev, gistId: json.id }));
+                alert("Database Created Successfully! Auto-sync is now active.");
+                setIsOnline(true);
+            }
+        } catch(e) { alert("Error: " + e.message); } finally { setIsSyncing(false); }
+    };
+
     const syncCloud = async (silent = false) => {
         if(!ghConfig.token || !ghConfig.gistId) return;
         setIsSyncing(true);
@@ -270,12 +289,10 @@ function App() {
         } catch(e) { alert("Load Failed: " + e.message); } finally { setIsSyncing(false); }
     };
 
-    // --- GOOGLE SHEET SYNC ---
     const syncToGoogleSheet = async () => {
         if(!sheetConfig.url) return alert("Please enter Google Script URL first.");
         setIsSyncing(true);
         try {
-            // Flatten sales for easier sheet reading
             const flatSales = data.sales.map(s => ({
                 id: s.id, date: s.date, total: s.total, cashier: s.cashier,
                 items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
@@ -283,11 +300,11 @@ function App() {
             
             await fetch(sheetConfig.url, {
                 method: "POST",
-                mode: "no-cors", // Google Scripts requires no-cors for simple posts
+                mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ type: 'SYNC', sales: flatSales, inventory: data.products })
             });
-            alert("Sent to Google Sheet! (Note: Updates may take a moment)");
+            alert("Sent to Google Sheet!");
         } catch(e) { alert("Sheet Error: " + e.message); } finally { setIsSyncing(false); }
     };
 
@@ -627,7 +644,7 @@ function App() {
 
             <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
                 <h3 className="font-bold mb-4">Cloud Backup (Gist)</h3>
-                <p className="text-xs text-gray-400 mb-4">Connect to GitHub for full database backup.</p>
+                <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
                 <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
                 
                 {ghConfig.gistId ? (
@@ -699,7 +716,9 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                {/* MOBILE TOP NAV (FIXED & SINGLE) */}
+                
+                {/* --- MOBILE TOP NAVIGATION (FIXED & SINGLE) --- */}
+                {/* Only visible on mobile, z-index 50 to stay on top */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -782,6 +801,7 @@ function App() {
                                             <div className="font-bold text-white">{item.name}</div>
                                             <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
                                         </div>
+                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>

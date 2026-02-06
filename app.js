@@ -165,19 +165,49 @@ function App() {
         setEditingItem(null);
     };
 
+    // --- GOOGLE SYNC FUNCTION (HIDDEN AUTO) ---
+    const syncToGoogleSheet = async (currentData) => {
+        if(!sheetConfig.url) return;
+        try {
+            const flatSales = currentData.sales.map(s => ({
+                id: s.id, date: s.date, total: s.total, cashier: s.cashier,
+                items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
+            }));
+            
+            // Fire and forget (no await blocking)
+            fetch(sheetConfig.url, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "text/plain" }, 
+                body: JSON.stringify({ type: 'PUSH', sales: flatSales, inventory: currentData.products })
+            });
+            console.log("Auto-synced to Google Sheet");
+        } catch(e) { console.error("Sync failed", e); }
+    };
+
     const checkout = () => {
         if(cart.length === 0) return;
         const total = cart.reduce((a,b) => a + (b.price * b.quantity), 0);
         const tx = { id: Date.now().toString(36).toUpperCase(), date: new Date().toISOString(), items: [...cart], total, cashier: user.name };
+        
         const newProducts = data.products.map(p => {
             const inCart = cart.find(c => c.id === p.id);
             return inCart ? { ...p, stock: p.stock - inCart.quantity } : p;
         });
         const newLogs = cart.map(i => ({ id: Date.now() + Math.random(), date: new Date().toISOString(), type: 'OUT', prodName: i.name, qty: i.quantity, reason: 'Sale' }));
-        setData(prev => ({ ...prev, products: newProducts, sales: [tx, ...prev.sales], stockLog: [...newLogs, ...prev.stockLog] }));
+        
+        const newData = { ...data, products: newProducts, sales: [tx, ...data.sales], stockLog: [...newLogs, ...data.stockLog] };
+        
+        // Update State
+        setData(newData);
         setReceiptTx(tx);
         setCart([]);
         setShowMobileCart(false);
+
+        // --- AUTO SYNC TRIGGER ---
+        if(sheetConfig.url) {
+            syncToGoogleSheet(newData);
+        }
     };
 
     const handlePrint = (tx) => {
@@ -295,51 +325,6 @@ function App() {
             } else { alert("No POS data found."); }
         } catch(e) { alert("Load Failed: " + e.message); } finally { setIsSyncing(false); }
     };
-
-    // --- GOOGLE SHEET SYNC (PUSH & PULL) ---
-    const syncToGoogleSheet = async () => {
-        if(!sheetConfig.url) return alert("Please enter Google Script URL first.");
-        setIsSyncing(true);
-        try {
-            const flatSales = data.sales.map(s => ({
-                id: s.id, date: s.date, total: s.total, cashier: s.cashier,
-                items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
-            }));
-            
-            await fetch(sheetConfig.url, {
-                method: "POST",
-                mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ type: 'PUSH', sales: flatSales, inventory: data.products })
-            });
-            alert("Sent to Google Sheet! (Check your sheet in a few seconds)");
-        } catch(e) { alert("Sync Error: " + e.message); } finally { setIsSyncing(false); }
-    };
-
-    const loadFromGoogleSheet = async () => {
-        if(!sheetConfig.url) return alert("Please enter Google Script URL first.");
-        setIsSyncing(true);
-        try {
-            // GET Data
-            const res = await fetch(sheetConfig.url); 
-            const cloudData = await res.json();
-            
-            if(cloudData && cloudData.inventory) {
-                if(confirm("Replace current inventory with Cloud data?")) {
-                    updateData('products', cloudData.inventory);
-                    alert("Inventory Loaded from Cloud!");
-                }
-            } else {
-                alert("No valid inventory data found in cloud.");
-            }
-        } catch(e) { alert("Load Error: " + e.message + "\nMake sure your script is deployed as 'Anyone'."); } finally { setIsSyncing(false); }
-    };
-
-    useEffect(() => {
-        if(!ghConfig.token || !ghConfig.gistId) return;
-        const timer = setTimeout(() => { syncCloud(true); }, 5000);
-        return () => clearTimeout(timer);
-    }, [data, ghConfig]);
 
     // --- NAVIGATION FILTER ---
     const getNavItems = () => {
@@ -666,11 +651,28 @@ function App() {
                 
                 <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Google Cloud Sync</h4>
                 <Input label="Web App URL" value={sheetConfig.url} onChange={e=>setSheetConfig({...sheetConfig, url: e.target.value})} placeholder="https://script.google.com/..." />
+            </div>
+
+            <div className="bg-white/5 p-6 rounded-2xl border border-white/5">
+                <h3 className="font-bold mb-4">Cloud Backup (Gist)</h3>
+                <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
+                <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
                 
-                <div className="flex gap-4">
-                    <Button onClick={syncToGoogleSheet} className="flex-1"><Icon name="cloud_upload"/> Sync (Push)</Button>
-                    <Button onClick={loadFromGoogleSheet} variant="secondary" className="flex-1"><Icon name="cloud_download"/> Load (Pull)</Button>
-                </div>
+                {ghConfig.gistId ? (
+                     <Input label="Gist ID" value={ghConfig.gistId} onChange={e=>setGhConfig({...ghConfig, gistId: e.target.value})} />
+                ) : (
+                    <div className="bg-white/5 p-3 rounded-xl mb-4 text-center">
+                        <p className="text-sm mb-3">No Database Connected</p>
+                        <Button onClick={createCloudDatabase} className="w-full bg-emerald-600 hover:bg-emerald-500">Create New Database</Button>
+                    </div>
+                )}
+                
+                {ghConfig.gistId && (
+                    <div className="flex gap-4 mt-4">
+                        <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync (Push)</Button>
+                        <Button onClick={loadFromCloud} variant="primary" className="flex-1">Load (Pull)</Button>
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
 import * as XLSX from 'xlsx';
 
 // --- ICONS ---
+// We use Google Fonts in index.html for these, so this component remains the same.
 const Icon = ({ name, size = 24, filled = false, className = "" }) => (
     <span className={`material-symbols-outlined ${className}`} 
           style={{ fontSize: size, fontVariationSettings: filled ? "'FILL' 1" : "'FILL' 0" }}>
@@ -37,6 +38,7 @@ const Input = ({ label, ...props }) => (
 
 // --- UTILS ---
 const generateReceiptPDF = (tx, profile) => {
+    // Removed window.jspdf destructuring, utilizing import
     const doc = new jsPDF({ format: [80, 200], unit: 'mm' });
     
     let y = 10;
@@ -71,6 +73,7 @@ const generateReceiptPDF = (tx, profile) => {
 };
 
 const generateStockReportPDF = (logs, profile) => {
+    // Removed window.jspdf destructuring
     const doc = new jsPDF();
     doc.setFontSize(18); doc.text("Stock Movement Report", 14, 20);
     doc.setFontSize(10); doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
@@ -168,11 +171,13 @@ function App() {
     const syncToGoogleSheet = async (currentData) => {
         if(!sheetConfig.url) return; 
         try {
+            // Prepare Sales (Flat)
             const flatSales = currentData.sales.map(s => ({
                 id: s.id, date: s.date, total: s.total, cashier: s.cashier,
                 items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
             }));
 
+            // Prepare Settings (Flat)
             const settingsExport = [
                 { section: "Profile", key: "Name", value: currentData.profile.name },
                 { section: "Profile", key: "Address", value: currentData.profile.address },
@@ -180,6 +185,7 @@ function App() {
                 { section: "GitHub", key: "Gist ID", value: ghConfig.gistId || "N/A" }
             ];
 
+            // Send EVERYTHING
             fetch(sheetConfig.url, {
                 method: "POST",
                 mode: "no-cors",
@@ -188,9 +194,9 @@ function App() {
                     type: 'PUSH', 
                     inventory: currentData.products,
                     sales: flatSales,
-                    stockLog: currentData.stockLog,
-                    users: currentData.users,
-                    settings: settingsExport
+                    stockLog: currentData.stockLog, // Added full logs
+                    users: currentData.users,       // Added users
+                    settings: settingsExport        // Added settings
                 })
             });
             console.log("Auto-synced full database to Google Sheet");
@@ -269,6 +275,8 @@ function App() {
 
     // --- FULL EXCEL EXPORT (5 SHEETS) ---
     const exportToExcel = () => {
+        // Changed window.XLSX check to direct check since we imported it
+        if(!XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
         const wb = XLSX.utils.book_new();
         
         // 1. Inventory
@@ -314,6 +322,7 @@ function App() {
     };
 
     const importFromExcel = (e) => {
+        if(!XLSX) { alert("Excel library not loaded."); return; }
         const file = e.target.files[0];
         if(!file) return;
         const reader = new FileReader();

@@ -35,17 +35,18 @@ const Input = ({ label, ...props }) => (
 // --- UTILS ---
 const generateReceiptPDF = (tx, profile) => {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ format: [80, 200], unit: 'mm' });
-    
+    const doc = new jsPDF({ format: [80, 220], unit: 'mm' });
+
     let y = 10;
     doc.setFontSize(14); doc.setFont(undefined, 'bold');
     doc.text(profile.name || "Glass POS", 40, y, { align: 'center' });
     y += 6;
-    
+
     doc.setFontSize(8); doc.setFont(undefined, 'normal');
     if(profile.address) { doc.text(profile.address, 40, y, { align: 'center' }); y+=4; }
     if(profile.phone) { doc.text(`Tel: ${profile.phone}`, 40, y, { align: 'center' }); y+=4; }
-    
+    if(profile.gst) { doc.text(`GSTIN: ${profile.gst}`, 40, y, { align: 'center' }); y+=4; }
+
     doc.text("--------------------------------", 40, y, { align: 'center' }); y+=4;
     doc.text(`Date: ${new Date(tx.date).toLocaleDateString()} ${new Date(tx.date).toLocaleTimeString()}`, 5, y); y+=4;
     doc.text(`Bill No: ${tx.id.slice(-6)}`, 5, y); y+=6;
@@ -61,6 +62,18 @@ const generateReceiptPDF = (tx, profile) => {
         doc.text((item.price * item.quantity).toFixed(2), 75, y, { align: 'right' });
         y+=4;
     });
+
+    doc.text("--------------------------------", 40, y, { align: 'center' }); y+=4;
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    doc.text(`Subtotal:`, 5, y);
+    doc.text(`Rs. ${(tx.subtotal ?? tx.total).toFixed(2)}`, 75, y, { align: 'right' }); y+=4;
+
+    if(tx.gstRate > 0) {
+        doc.text(`CGST (${tx.gstRate / 2}%):`, 5, y);
+        doc.text(`Rs. ${tx.cgst?.toFixed(2)}`, 75, y, { align: 'right' }); y+=4;
+        doc.text(`SGST (${tx.gstRate / 2}%):`, 5, y);
+        doc.text(`Rs. ${tx.sgst?.toFixed(2)}`, 75, y, { align: 'right' }); y+=4;
+    }
 
     doc.text("--------------------------------", 40, y, { align: 'center' }); y+=4;
     doc.setFontSize(12); doc.setFont(undefined, 'bold');
@@ -86,14 +99,14 @@ function App() {
     const [view, setView] = useState('login'); 
     const [user, setUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    
+
     // UI State
     const [showMobileCart, setShowMobileCart] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
-    
+
     // DATA STORE
     const [data, setData] = useState(() => {
-        const saved = localStorage.getItem('pos_data_v37'); 
+        const saved = localStorage.getItem('pos_data_v38'); 
         return saved ? JSON.parse(saved) : {
             products: [
                 { id: 1, name: "Masala Chai", price: 15.00, category: "Tea", stock: 100, image: "" },
@@ -107,19 +120,28 @@ function App() {
             ],
             sales: [],
             stockLog: [],
-            profile: { name: "Prasad coffee shop", address: "Raichur", phone: "9353437302", type: "Coffee Shop", location: "RAICHUR", gst: "0001111", logo: "" }
+            profile: { 
+                name: "Prasad coffee shop", 
+                address: "Raichur", 
+                phone: "9353437302", 
+                type: "Coffee Shop", 
+                location: "RAICHUR", 
+                gst: "29ABCDE1234F1Z5",
+                gstRate: 5,
+                logo: "" 
+            }
         };
     });
 
     const [cart, setCart] = useState([]);
     const [ghConfig, setGhConfig] = useState(() => JSON.parse(localStorage.getItem('gh_config')) || { token: '', gistId: '' });
     const [sheetConfig, setSheetConfig] = useState(() => JSON.parse(localStorage.getItem('sheet_config')) || { url: '' });
-    
+
     const [isOnline, setIsOnline] = useState(false);
     const [receiptTx, setReceiptTx] = useState(null);
 
     // PERSISTENCE
-    useEffect(() => localStorage.setItem('pos_data_v37', JSON.stringify(data)), [data]);
+    useEffect(() => localStorage.setItem('pos_data_v38', JSON.stringify(data)), [data]);
     useEffect(() => {
         localStorage.setItem('gh_config', JSON.stringify(ghConfig));
         if (ghConfig.token && ghConfig.gistId) setIsOnline(true);
@@ -128,7 +150,7 @@ function App() {
 
     // ACTIONS
     const updateData = (key, val) => setData(prev => ({ ...prev, [key]: val }));
-    
+
     const updateCartQty = (itemId, delta) => {
         setCart(prev => {
             return prev.map(item => {
@@ -167,21 +189,19 @@ function App() {
     const syncToGoogleSheet = async (currentData) => {
         if(!sheetConfig.url) return; 
         try {
-            // Prepare Sales (Flat)
             const flatSales = currentData.sales.map(s => ({
-                id: s.id, date: s.date, total: s.total, cashier: s.cashier,
+                id: s.id, date: s.date, subtotal: s.subtotal ?? s.total,
+                cgst: s.cgst ?? 0, sgst: s.sgst ?? 0, total: s.total, cashier: s.cashier,
                 items: s.items.map(i=>`${i.name} (${i.quantity})`).join(', ')
             }));
-
-            // Prepare Settings (Flat)
             const settingsExport = [
                 { section: "Profile", key: "Name", value: currentData.profile.name },
                 { section: "Profile", key: "Address", value: currentData.profile.address },
                 { section: "Profile", key: "Phone", value: currentData.profile.phone },
+                { section: "Profile", key: "GSTIN", value: currentData.profile.gst },
+                { section: "Profile", key: "GST Rate", value: currentData.profile.gstRate + "%" },
                 { section: "GitHub", key: "Gist ID", value: ghConfig.gistId || "N/A" }
             ];
-
-            // Send EVERYTHING
             fetch(sheetConfig.url, {
                 method: "POST",
                 mode: "no-cors",
@@ -190,9 +210,9 @@ function App() {
                     type: 'PUSH', 
                     inventory: currentData.products,
                     sales: flatSales,
-                    stockLog: currentData.stockLog, // Added full logs
-                    users: currentData.users,       // Added users
-                    settings: settingsExport        // Added settings
+                    stockLog: currentData.stockLog,
+                    users: currentData.users,
+                    settings: settingsExport
                 })
             });
             console.log("Auto-synced full database to Google Sheet");
@@ -205,7 +225,6 @@ function App() {
         try {
             const res = await fetch(sheetConfig.url);
             const cloudData = await res.json();
-            
             if(cloudData && cloudData.inventory) {
                 if(confirm("Replace current inventory with Cloud data?")) {
                     updateData('products', cloudData.inventory);
@@ -217,50 +236,78 @@ function App() {
         } catch(e) { alert("Load Error: " + e.message); } finally { setIsSyncing(false); }
     };
 
+    // --- CHECKOUT WITH GST ---
     const checkout = () => {
         if(cart.length === 0) return;
-        const total = cart.reduce((a,b) => a + (b.price * b.quantity), 0);
-        const tx = { id: Date.now().toString(36).toUpperCase(), date: new Date().toISOString(), items: [...cart], total, cashier: user.name };
-        
+        const subtotal = parseFloat(cart.reduce((a,b) => a + (b.price * b.quantity), 0).toFixed(2));
+        const gstRate = data.profile.gstRate || 0;
+        const totalGst = parseFloat(((subtotal * gstRate) / 100).toFixed(2));
+        const cgst = parseFloat((totalGst / 2).toFixed(2));
+        const sgst = parseFloat((totalGst / 2).toFixed(2));
+        const total = parseFloat((subtotal + totalGst).toFixed(2));
+
+        const tx = { 
+            id: Date.now().toString(36).toUpperCase(), 
+            date: new Date().toISOString(), 
+            items: [...cart], 
+            subtotal,
+            gstRate,
+            cgst,
+            sgst,
+            gstAmount: totalGst,
+            total, 
+            cashier: user.name 
+        };
+
         const newProducts = data.products.map(p => {
             const inCart = cart.find(c => c.id === p.id);
             return inCart ? { ...p, stock: p.stock - inCart.quantity } : p;
         });
         const newLogs = cart.map(i => ({ id: Date.now() + Math.random(), date: new Date().toISOString(), type: 'OUT', prodName: i.name, qty: i.quantity, reason: 'Sale' }));
-        
+
         const newData = { ...data, products: newProducts, sales: [tx, ...data.sales], stockLog: [...newLogs, ...data.stockLog] };
-        
-        // Update State
+
         setData(newData);
         setReceiptTx(tx);
         setCart([]);
         setShowMobileCart(false);
 
-        // --- AUTO SYNC TRIGGER ---
-        if(sheetConfig.url) {
-            syncToGoogleSheet(newData);
-        }
+        if(sheetConfig.url) syncToGoogleSheet(newData);
     };
 
+    // --- PRINT WITH CGST/SGST ---
     const handlePrint = (tx) => {
+        const gstRate = tx.gstRate || 0;
         const printContent = `
             <div style="font-family: monospace; text-align: center; width: 100%; max-width: 300px; margin: 0 auto; color: black; padding: 10px;">
                 <h2 style="margin: 0; font-size: 16px; font-weight: bold;">${data.profile.name}</h2>
                 <p style="margin: 2px 0; font-size: 12px;">${data.profile.address}</p>
                 <p style="margin: 2px 0; font-size: 12px;">Tel: ${data.profile.phone}</p>
+                ${data.profile.gst ? `<p style="margin: 2px 0; font-size: 11px;">GSTIN: ${data.profile.gst}</p>` : ''}
                 <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
                 <div style="text-align: left; font-size: 12px; display: flex; justify-content: space-between;">
                     <span>Bill: ${tx.id.slice(-6)}</span>
                     <span>${new Date(tx.date).toLocaleDateString()}</span>
                 </div>
-                 <div style="text-align: left; font-size: 12px;">${new Date(tx.date).toLocaleTimeString()}</div>
+                <div style="text-align: left; font-size: 12px;">${new Date(tx.date).toLocaleTimeString()}</div>
                 <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
                 <table style="width: 100%; font-size: 12px; text-align: left; border-collapse: collapse;">
                     <thead><tr><th style="padding: 2px 0;">Item</th><th style="padding: 2px 0; text-align:center">Qty</th><th style="padding: 2px 0; text-align:right">Price</th></tr></thead>
                     <tbody>${tx.items.map(item => `<tr><td style="padding: 2px 0;">${item.name}</td><td style="padding: 2px 0; text-align:center">${item.quantity}</td><td style="padding: 2px 0; text-align:right">${(item.price * item.quantity).toFixed(2)}</td></tr>`).join('')}</tbody>
                 </table>
                 <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
-                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px;"><span>TOTAL</span><span>₹${tx.total.toFixed(2)}</span></div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#555;">
+                    <span>Subtotal</span><span>&#8377;${(tx.subtotal ?? tx.total).toFixed(2)}</span>
+                </div>
+                ${gstRate > 0 ? `
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#777;">
+                    <span>CGST (${gstRate / 2}%)</span><span>&#8377;${tx.cgst?.toFixed(2)}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:11px; color:#777;">
+                    <span>SGST (${gstRate / 2}%)</span><span>&#8377;${tx.sgst?.toFixed(2)}</span>
+                </div>` : ''}
+                <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px;"><span>TOTAL</span><span>&#8377;${tx.total.toFixed(2)}</span></div>
                 <div style="border-bottom: 1px dashed black; margin: 5px 0;"></div>
                 <p style="font-size: 10px; margin-top: 5px;">Thank you! Visit Again.</p>
             </div>
@@ -273,39 +320,37 @@ function App() {
     const exportToExcel = () => {
         if(!window.XLSX) { alert("Excel library not loaded. Please connect to internet."); return; }
         const wb = XLSX.utils.book_new();
-        
-        // 1. Inventory
+
         const wsProducts = XLSX.utils.json_to_sheet(data.products);
         XLSX.utils.book_append_sheet(wb, wsProducts, "Inventory");
-        
-        // 2. Sales
+
         const flatSales = data.sales.map(s => ({
-            BillID: s.id, Date: new Date(s.date).toLocaleString(), Cashier: s.cashier, Total: s.total,
+            BillID: s.id, Date: new Date(s.date).toLocaleString(), Cashier: s.cashier,
+            Subtotal: s.subtotal ?? s.total,
+            CGST: s.cgst ?? 0,
+            SGST: s.sgst ?? 0,
+            Total: s.total,
             Items: s.items.map(i => `${i.name} (x${i.quantity})`).join(", ")
         }));
         const wsSales = XLSX.utils.json_to_sheet(flatSales);
         XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
 
-        // 3. Stock Logs
         const flatLogs = data.stockLog.map(l => ({
             Date: new Date(l.date).toLocaleString(),
-            Type: l.type,
-            Item: l.prodName,
-            Qty: l.qty,
-            Reason: l.reason
+            Type: l.type, Item: l.prodName, Qty: l.qty, Reason: l.reason
         }));
         const wsLogs = XLSX.utils.json_to_sheet(flatLogs);
         XLSX.utils.book_append_sheet(wb, wsLogs, "Stock_Logs");
 
-        // 4. Users
         const wsUsers = XLSX.utils.json_to_sheet(data.users);
         XLSX.utils.book_append_sheet(wb, wsUsers, "Users");
 
-        // 5. App Settings
         const settingsData = [
             { Section: "Business Profile", Key: "Business Name", Value: data.profile.name },
             { Section: "Business Profile", Key: "Address", Value: data.profile.address },
             { Section: "Business Profile", Key: "Phone", Value: data.profile.phone },
+            { Section: "Business Profile", Key: "GSTIN", Value: data.profile.gst || "Not Set" },
+            { Section: "Business Profile", Key: "GST Rate (%)", Value: data.profile.gstRate ?? 0 },
             { Section: "Google Cloud Sync", Key: "Web App URL", Value: sheetConfig.url || "Not Set" },
             { Section: "Cloud Backup (Gist)", Key: "GitHub Token", Value: ghConfig.token || "Not Set" },
             { Section: "Cloud Backup (Gist)", Key: "Gist ID", Value: ghConfig.gistId || "Not Set" }
@@ -430,7 +475,12 @@ function App() {
     const POSView = () => {
         const [search, setSearch] = useState("");
         const filtered = data.products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
-        const currentTotal = cart.reduce((a,b) => a + (b.price * b.quantity), 0);
+        const subtotal = cart.reduce((a,b) => a + (b.price * b.quantity), 0);
+        const gstRate = data.profile.gstRate || 0;
+        const totalGst = (subtotal * gstRate) / 100;
+        const cgst = totalGst / 2;
+        const sgst = totalGst / 2;
+        const grandTotal = subtotal + totalGst;
 
         return (
             <div className="flex h-full animate-in overflow-hidden">
@@ -467,13 +517,13 @@ function App() {
                                 )}
                                 <div className="font-bold text-white leading-tight mb-1">{p.name}</div>
                                 <div className="text-xs text-gray-400 mb-2">{p.stock} in stock</div>
-                                <div className="font-mono text-[#6366f1] font-bold">₹{p.price.toFixed(2)}</div>
+                                <div className="font-mono text-[#6366f1] font-bold">&#8377;{p.price.toFixed(2)}</div>
                                 {p.stock <= 0 && <div className="absolute top-2 right-2 bg-red-500/20 text-red-400 text-[10px] px-2 py-0.5 rounded font-bold">OUT</div>}
                             </button>
                         ))}
                     </div>
-                    
-                    {/* --- MOBILE FLOATING BILL BAR --- */}
+
+                    {/* MOBILE FLOATING BILL BAR */}
                     {cart.length > 0 && (
                         <div className="md:hidden fixed bottom-6 left-4 right-4 z-50 animate-in">
                             <div className="bg-[#1e1e2d] p-4 rounded-2xl shadow-2xl flex items-center justify-between border border-white/10 ring-1 ring-white/5">
@@ -484,7 +534,7 @@ function App() {
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-gray-400 uppercase tracking-wider font-bold mb-0.5 flex items-center gap-1">Total <Icon name="expand_less" size={14}/></div>
-                                        <div className="font-bold text-white text-xl">₹{currentTotal.toFixed(2)}</div>
+                                        <div className="font-bold text-white text-xl">&#8377;{grandTotal.toFixed(2)}</div>
                                     </div>
                                 </div>
                                 <Button onClick={checkout} className="bg-[#6366f1] hover:bg-[#4f46e5] px-8 py-3 h-12 text-base shadow-lg shadow-indigo-500/30 border-none">Gen Bill</Button>
@@ -493,7 +543,7 @@ function App() {
                     )}
                 </div>
 
-                {/* --- DESKTOP SIDEBARS --- */}
+                {/* DESKTOP CART SIDEBAR */}
                 <div className="hidden md:flex w-[320px] lg:w-[380px] flex-col border-l border-white/5 bg-[#181b29] h-full shrink-0">
                     <div className="p-6 border-b border-white/5 flex justify-between items-center">
                         <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="receipt_long"/> Current Bill</h2>
@@ -510,14 +560,14 @@ function App() {
                                 <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between group">
                                     <div className="flex-1 min-w-0">
                                         <div className="font-bold text-white text-sm truncate">{item.name}</div>
-                                        <div className="text-xs text-gray-400">₹{item.price}</div>
+                                        <div className="text-xs text-gray-400">&#8377;{item.price}</div>
                                     </div>
                                     <div className="flex items-center gap-2 bg-[#0f111a] rounded-lg p-1 mx-2">
                                         <button onClick={() => updateCartQty(item.id, -1)} className="w-6 h-6 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"><Icon name="remove" size={14}/></button>
                                         <span className="font-mono font-bold w-4 text-center text-white text-xs">{item.quantity}</span>
                                         <button onClick={() => updateCartQty(item.id, 1)} className="w-6 h-6 flex items-center justify-center text-white bg-[#6366f1] hover:bg-[#4f46e5] rounded transition-colors"><Icon name="add" size={14}/></button>
                                     </div>
-                                    <div className="font-bold text-white text-sm w-16 text-right">₹{(item.price * item.quantity).toFixed(2)}</div>
+                                    <div className="font-bold text-white text-sm w-16 text-right">&#8377;{(item.price * item.quantity).toFixed(2)}</div>
                                 </div>
                              ))
                         )}
@@ -528,9 +578,25 @@ function App() {
                                 <span>Items</span>
                                 <span>{cart.reduce((a,b)=>a+b.quantity,0)}</span>
                             </div>
-                            <div className="flex justify-between text-xl font-bold text-white">
+                            <div className="flex justify-between text-sm text-gray-400">
+                                <span>Subtotal</span>
+                                <span>&#8377;{subtotal.toFixed(2)}</span>
+                            </div>
+                            {gstRate > 0 && (
+                                <>
+                                    <div className="flex justify-between text-sm text-amber-400">
+                                        <span>CGST ({gstRate / 2}%)</span>
+                                        <span>&#8377;{cgst.toFixed(2)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm text-amber-400">
+                                        <span>SGST ({gstRate / 2}%)</span>
+                                        <span>&#8377;{sgst.toFixed(2)}</span>
+                                    </div>
+                                </>
+                            )}
+                            <div className="flex justify-between text-xl font-bold text-white border-t border-white/10 pt-2">
                                 <span>Total</span>
-                                <span>₹{currentTotal.toFixed(2)}</span>
+                                <span>&#8377;{grandTotal.toFixed(2)}</span>
                             </div>
                         </div>
                         <Button onClick={checkout} className="w-full py-4 text-base" disabled={cart.length===0}>Generate Bill & Print</Button>
@@ -546,7 +612,7 @@ function App() {
                 <h2 className="text-2xl font-bold">Inventory</h2>
                 <Button onClick={() => {
                     const n = prompt("Item Name");
-                    const p = Number(prompt("Price (₹)"));
+                    const p = Number(prompt("Price (&#8377;)"));
                     const s = Number(prompt("Initial Stock"));
                     const img = prompt("Image URL (Optional)");
                     if(n && p && s) {
@@ -563,7 +629,7 @@ function App() {
                             {p.image ? <img src={p.image} className="w-10 h-10 rounded-lg object-cover bg-[#2b2b40]"/> : <div className="w-10 h-10 rounded-lg bg-[#2b2b40] flex items-center justify-center text-xs text-gray-500"><Icon name="image_not_supported" size={18}/></div>}
                             <div>
                                 <div className="font-bold text-white">{p.name}</div>
-                                <div className="text-xs text-gray-400">₹{p.price}</div>
+                                <div className="text-xs text-gray-400">&#8377;{p.price}</div>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -597,7 +663,10 @@ function App() {
                         <div className="bg-white/5 p-5 rounded-2xl relative overflow-hidden col-span-2 bg-gradient-to-br from-white/5 to-transparent">
                             <div className="absolute top-0 right-0 p-4 opacity-10"><Icon name="trending_up" size={64}/></div>
                             <div className="text-xs text-gray-400 uppercase tracking-wider font-bold">Total Revenue</div>
-                            <div className="text-3xl font-bold mt-1 text-white">₹{data.sales.reduce((a,b)=>a+b.total,0).toFixed(2)}</div>
+                            <div className="text-3xl font-bold mt-1 text-white">&#8377;{data.sales.reduce((a,b)=>a+b.total,0).toFixed(2)}</div>
+                            <div className="text-xs text-amber-400 mt-1">
+                                Total GST Collected: &#8377;{data.sales.reduce((a,b)=>a+(b.gstAmount||0),0).toFixed(2)}
+                            </div>
                         </div>
                         <div className="bg-white/5 p-4 rounded-2xl col-span-2">
                              <div className="flex justify-between items-center mb-2">
@@ -607,7 +676,10 @@ function App() {
                                 {data.sales.slice(0, 5).map(s => (
                                     <div key={s.id} className="flex justify-between p-2 bg-white/5 rounded">
                                         <span>{new Date(s.date).toLocaleTimeString()}</span>
-                                        <span className="font-bold">₹{s.total}</span>
+                                        <div className="flex gap-4">
+                                            {s.gstRate > 0 && <span className="text-amber-400">GST: &#8377;{s.gstAmount?.toFixed(2)}</span>}
+                                            <span className="font-bold">&#8377;{s.total}</span>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -696,15 +768,31 @@ function App() {
         <div className="animate-in pt-[130px] md:pt-0 p-4 lg:p-8 overflow-y-auto h-full">
             <h2 className="text-2xl font-bold mb-6">Settings</h2>
              <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
-                <h3 className="font-bold mb-4">Business Profile</h3>
-                <div className="space-y-4">
+                <h3 className="font-bold mb-4 flex items-center gap-2"><Icon name="store" size={20}/> Business Profile</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                     <Input label="Business Name" value={data.profile.name} onChange={e => updateData('profile', {...data.profile, name: e.target.value})} />
                     <Input label="Address" value={data.profile.address} onChange={e => updateData('profile', {...data.profile, address: e.target.value})} />
                     <Input label="Phone" value={data.profile.phone} onChange={e => updateData('profile', {...data.profile, phone: e.target.value})} />
+                    <Input label="GST Number (GSTIN)" value={data.profile.gst || ''} onChange={e => updateData('profile', {...data.profile, gst: e.target.value})} placeholder="e.g. 29ABCDE1234F1Z5" />
+                    <div className="mb-4 w-full">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2 tracking-wider">GST Rate (%)</label>
+                        <select value={data.profile.gstRate ?? 5} onChange={e => updateData('profile', {...data.profile, gstRate: Number(e.target.value)})} className="w-full px-4 py-3 bg-[#23263a] border border-white/5 rounded-xl text-white text-sm outline-none focus:ring-2 focus:ring-[#6366f1]">
+                            <option value={0}>0% (GST Exempt)</option>
+                            <option value={5}>5% (CGST 2.5% + SGST 2.5%)</option>
+                            <option value={12}>12% (CGST 6% + SGST 6%)</option>
+                            <option value={18}>18% (CGST 9% + SGST 9%)</option>
+                            <option value={28}>28% (CGST 14% + SGST 14%)</option>
+                        </select>
+                    </div>
+                    {data.profile.gstRate > 0 && (
+                        <div className="mb-4 bg-amber-500/10 border border-amber-500/20 p-3 rounded-xl text-xs text-amber-300 flex items-start gap-2">
+                            <Icon name="info" size={16} className="mt-0.5 shrink-0"/>
+                            <span>CGST {data.profile.gstRate/2}% + SGST {data.profile.gstRate/2}% will be applied on all bills (Total GST: {data.profile.gstRate}%)</span>
+                        </div>
+                    )}
                 </div>
             </div>
-            
-            {/* EXCEL & GOOGLE SHEET SYNC */}
+
             <div className="bg-white/5 p-6 rounded-2xl mb-6 border border-white/5">
                 <h3 className="font-bold mb-4">Data Management</h3>
                 <div className="flex gap-4 mb-6">
@@ -714,10 +802,10 @@ function App() {
                         <input type="file" accept=".xlsx, .xls" className="hidden" onChange={importFromExcel} />
                     </label>
                 </div>
-                
+
                 <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-2">Google Cloud Sync</h4>
                 <Input label="Web App URL" value={sheetConfig.url} onChange={e=>setSheetConfig({...sheetConfig, url: e.target.value})} placeholder="https://script.google.com/..." />
-                
+
                 <div className="flex gap-4">
                     <Button onClick={() => syncToGoogleSheet(data)} className="flex-1"><Icon name="cloud_upload"/> Sync (Push)</Button>
                     <Button onClick={loadFromGoogleSheet} variant="secondary" className="flex-1"><Icon name="cloud_download"/> Load (Pull)</Button>
@@ -728,7 +816,7 @@ function App() {
                 <h3 className="font-bold mb-4">Cloud Backup (Gist)</h3>
                 <p className="text-xs text-gray-400 mb-4">Connect to GitHub to save your data automatically.</p>
                 <Input label="Github Token" type="password" value={ghConfig.token} onChange={e=>setGhConfig({...ghConfig, token: e.target.value})} />
-                
+
                 {ghConfig.gistId ? (
                      <Input label="Gist ID" value={ghConfig.gistId} onChange={e=>setGhConfig({...ghConfig, gistId: e.target.value})} />
                 ) : (
@@ -737,7 +825,7 @@ function App() {
                         <Button onClick={createCloudDatabase} className="w-full bg-emerald-600 hover:bg-emerald-500">Create New Database</Button>
                     </div>
                 )}
-                
+
                 {ghConfig.gistId && (
                     <div className="flex gap-4 mt-4">
                         <Button onClick={() => syncCloud(false)} variant="secondary" className="flex-1">Sync (Push)</Button>
@@ -798,9 +886,8 @@ function App() {
             </aside>
 
             <main className="flex-1 flex flex-col h-full relative overflow-hidden z-0">
-                
-                {/* --- MOBILE TOP NAVIGATION (FIXED & SINGLE) --- */}
-                {/* Only visible on mobile, z-index 50 to stay on top */}
+
+                {/* MOBILE TOP NAVIGATION */}
                 <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[#0f111a]/95 backdrop-blur-xl border-b border-white/5 pb-2">
                     <div className="flex justify-between items-center p-4 pb-2">
                          <h1 className="font-bold text-lg flex items-center gap-2">
@@ -808,7 +895,6 @@ function App() {
                          </h1>
                          <button onClick={() => setView('login')} className="text-xs text-gray-500 hover:text-white">Logout</button>
                     </div>
-                    {/* Navigation Icons Row */}
                     <div className="flex justify-around items-center px-2">
                         {getNavItems().map(item => (
                             <button 
@@ -822,7 +908,6 @@ function App() {
                     </div>
                 </div>
 
-                {/* Content Area with Top Padding for Mobile Nav */}
                 <div className="flex-1 overflow-hidden h-full pt-[110px] md:pt-0">
                     {view === 'pos' && <POSView />}
                     {view === 'inventory' && user.role === 'Admin' && <InventoryView />}
@@ -832,7 +917,7 @@ function App() {
                 </div>
             </main>
 
-            {/* Receipt Modal */}
+            {/* RECEIPT MODAL */}
             {receiptTx && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in">
                     <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl border border-white/10">
@@ -841,9 +926,16 @@ function App() {
                             <button onClick={()=>setReceiptTx(null)}><Icon name="close"/></button>
                         </div>
                         <div className="p-6 bg-white text-black font-mono text-sm relative">
-                            <div className="text-center mb-4">
+                            <div className="text-center mb-3">
                                 <div className="font-bold text-lg">{data.profile.name}</div>
                                 <div className="text-xs text-gray-500">{data.profile.address}</div>
+                                <div className="text-xs text-gray-500">Tel: {data.profile.phone}</div>
+                                {data.profile.gst && <div className="text-xs text-gray-500">GSTIN: {data.profile.gst}</div>}
+                            </div>
+                            <div className="border-b border-dashed border-gray-300 my-2"></div>
+                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                <span>Bill: {receiptTx.id.slice(-6)}</span>
+                                <span>{new Date(receiptTx.date).toLocaleDateString()}</span>
                             </div>
                             <div className="border-b border-dashed border-gray-300 my-2"></div>
                             {receiptTx.items.map((i,idx) => (
@@ -852,10 +944,29 @@ function App() {
                                     <span>{(i.price*i.quantity).toFixed(2)}</span>
                                 </div>
                             ))}
-                            <div className="border-t border-dashed border-gray-300 my-2 pt-2 flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span>₹{receiptTx.total.toFixed(2)}</span>
+                            <div className="border-t border-dashed border-gray-300 my-2 pt-2 space-y-1">
+                                <div className="flex justify-between text-sm text-gray-600">
+                                    <span>Subtotal</span>
+                                    <span>&#8377;{(receiptTx.subtotal ?? receiptTx.total).toFixed(2)}</span>
+                                </div>
+                                {receiptTx.gstRate > 0 && (
+                                    <>
+                                        <div className="flex justify-between text-sm text-amber-600">
+                                            <span>CGST ({receiptTx.gstRate / 2}%)</span>
+                                            <span>&#8377;{receiptTx.cgst?.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm text-amber-600">
+                                            <span>SGST ({receiptTx.gstRate / 2}%)</span>
+                                            <span>&#8377;{receiptTx.sgst?.toFixed(2)}</span>
+                                        </div>
+                                    </>
+                                )}
+                                <div className="flex justify-between font-bold text-lg border-t border-gray-300 pt-1">
+                                    <span>TOTAL</span>
+                                    <span>&#8377;{receiptTx.total.toFixed(2)}</span>
+                                </div>
                             </div>
+                            <p className="text-center text-xs text-gray-400 mt-3">Thank you! Visit Again.</p>
                         </div>
                         <div className="p-4 grid grid-cols-2 gap-3">
                             <Button onClick={() => handlePrint(receiptTx)} variant="secondary"><Icon name="print"/> Print</Button>
@@ -865,7 +976,7 @@ function App() {
                 </div>
             )}
 
-            {/* MOBILE CART MODAL (Bottom Sheet) */}
+            {/* MOBILE CART MODAL */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex flex-col justify-end animate-in">
                     <div className="bg-[#1e1e2d] rounded-t-3xl w-full max-h-[80vh] flex flex-col border-t border-white/10 shadow-2xl">
@@ -881,9 +992,8 @@ function App() {
                                     <div key={item.id} className="bg-white/5 p-3 rounded-xl flex items-center justify-between">
                                         <div className="flex-1">
                                             <div className="font-bold text-white">{item.name}</div>
-                                            <div className="text-sm text-[#6366f1] font-bold">₹{item.price}</div>
+                                            <div className="text-sm text-[#6366f1] font-bold">&#8377;{item.price}</div>
                                         </div>
-                                        {/* Mobile Cart Controls */}
                                         <div className="flex items-center gap-3 bg-[#2b2b40] rounded-lg p-1">
                                             <button onClick={() => updateCartQty(item.id, -1)} className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white bg-white/5 rounded-md active:scale-95"><Icon name="remove" size={16}/></button>
                                             <span className="font-mono font-bold w-6 text-center text-white">{item.quantity}</span>
@@ -900,14 +1010,14 @@ function App() {
                 </div>
             )}
 
-            {/* Edit Item Modal */}
+            {/* EDIT ITEM MODAL */}
             {editingItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in">
                     <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl p-6 border border-white/10">
                         <h3 className="font-bold mb-4 text-lg">Edit Item</h3>
                         <div className="space-y-4">
                             <Input label="Name" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} />
-                            <Input label="Price (₹)" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} />
+                            <Input label="Price (&#8377;)" type="number" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: Number(e.target.value)})} />
                             <Input label="Image URL" value={editingItem.image || ''} onChange={e => setEditingItem({...editingItem, image: e.target.value})} />
                             <div className="flex gap-4 pt-2">
                                 <Button onClick={() => setEditingItem(null)} variant="secondary" className="flex-1">Cancel</Button>
